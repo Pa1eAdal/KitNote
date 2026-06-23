@@ -7,10 +7,11 @@ import { isTauriRuntime } from "../utils/tauri";
 interface TopToolbarProps {
   note: Note;
   onCreateNote: () => void;
+  newNoteDisabled?: boolean;
   onToggleMenu: () => void;
 }
 
-export function TopToolbar({ note, onCreateNote, onToggleMenu }: TopToolbarProps) {
+export function TopToolbar({ note, onCreateNote, newNoteDisabled = false, onToggleMenu }: TopToolbarProps) {
   const closeWindow = async () => {
     if (isTauriRuntime()) {
       await getCurrentWindow().hide();
@@ -25,7 +26,7 @@ export function TopToolbar({ note, onCreateNote, onToggleMenu }: TopToolbarProps
         {note.title}
       </div>
       <div className="toolbar-actions">
-        <IconButton label="New note" onClick={onCreateNote}>
+        <IconButton label="New note" onClick={onCreateNote} disabled={newNoteDisabled}>
           <Plus size={16} />
         </IconButton>
         <IconButton label="Settings" onClick={onToggleMenu}>

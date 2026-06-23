@@ -25,6 +25,7 @@ export default function App() {
   const [preview, setPreview] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
+  const [creatingNote, setCreatingNote] = useState(false);
   const [status, setStatus] = useState("Loading KitNote...");
 
   useEffect(() => {
@@ -90,10 +91,6 @@ export default function App() {
     });
   }, []);
 
-  const insertMarkdown = useCallback((markdown: string) => {
-    setNote((current) => (current ? { ...current, content: `${current.content}\n${markdown}\n` } : current));
-  }, []);
-
   const insertImageFromPath = useCallback(
     async (path: string) => {
       if (!note) return;
@@ -130,12 +127,21 @@ export default function App() {
   }, [insertImageFromPath]);
 
   const createAnotherNote = useCallback(async () => {
-    if (!note) return;
-    const next = await createNoteWindow(note);
-    if (!isTauriRuntime()) {
-      setNote(next);
+    if (!note || creatingNote) return;
+    setCreatingNote(true);
+    setStatus("Creating note...");
+    try {
+      const next = await createNoteWindow(note);
+      if (!isTauriRuntime()) {
+        setNote(next);
+      }
+      setStatus("New note created");
+    } catch (error) {
+      setStatus(error instanceof Error ? error.message : "Could not create note");
+    } finally {
+      setCreatingNote(false);
     }
-  }, [note]);
+  }, [creatingNote, note]);
 
   const insertLink = useCallback((text: string, target: string, kind: Hyperlink["kind"]) => {
     const link: Hyperlink = { id: crypto.randomUUID(), text, target, kind };
@@ -196,7 +202,12 @@ export default function App() {
       onDragOver={(event) => event.preventDefault()}
       onDrop={handleDrop}
     >
-      <TopToolbar note={note} onCreateNote={createAnotherNote} onToggleMenu={() => setMenuOpen((open) => !open)} />
+      <TopToolbar
+        note={note}
+        onCreateNote={createAnotherNote}
+        newNoteDisabled={creatingNote}
+        onToggleMenu={() => setMenuOpen((open) => !open)}
+      />
       {menuOpen ? (
         <SettingsMenu settings={note.settings} appVersion={appVersion} onSettingsChange={updateSettings} />
       ) : null}

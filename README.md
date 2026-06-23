@@ -160,6 +160,8 @@ git push -u origin main
 - Window position and size fields exist in the data model, but full automatic save/restore still needs more work.
 - Risky local file links are currently blocked instead of showing a confirmation dialog.
 - MSI generation may require extra Windows build tooling.
+- Rounded corners use a transparent, decoration-free Tauri window with the visible note inset in CSS. Native Windows shadows are disabled for transparent note windows to avoid a rectangular frame around rounded corners.
+- Runtime diagnostics are written to `kitnote.log` in the same app data directory as `notes.json`.
 
 ## Future Work
 
