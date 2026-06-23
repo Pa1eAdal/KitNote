@@ -136,6 +136,12 @@ fn empty_note(settings: NoteSettings) -> Note {
     }
 }
 
+fn note_from_template(source: Note) -> Note {
+    let mut note = empty_note(source.settings);
+    note.window = source.window;
+    note
+}
+
 fn default_app_data() -> AppData {
     AppData {
         schema_version: 1,
@@ -250,8 +256,7 @@ fn create_note_window(
     state: State<'_, AppState>,
     source: Note,
 ) -> Result<Note, String> {
-    let mut note = empty_note(source.settings);
-    note.window = source.window;
+    let note = note_from_template(source);
 
     {
         let _guard = state
@@ -421,7 +426,10 @@ pub fn run() {
 
 #[cfg(test)]
 mod tests {
-    use super::{has_risky_extension, is_allowed_image_extension};
+    use super::{
+        default_note_settings, empty_note, has_risky_extension, is_allowed_image_extension,
+        note_from_template, Hyperlink, InsertedImage, LinkKind,
+    };
     use std::path::Path;
 
     #[test]
@@ -436,5 +444,42 @@ mod tests {
         assert!(has_risky_extension(Path::new("installer.exe")));
         assert!(has_risky_extension(Path::new("script.ps1")));
         assert!(!has_risky_extension(Path::new("document.pdf")));
+    }
+
+    #[test]
+    fn note_template_copies_settings_and_window_but_not_content() {
+        let mut source = empty_note(default_note_settings());
+        source.content = "do not copy this text".to_string();
+        source.settings.background_color = "#ff0000".to_string();
+        source.settings.opacity = 0.75;
+        source.window.x = Some(120);
+        source.window.y = Some(160);
+        source.window.width = 480.0;
+        source.window.height = 320.0;
+        source.images.push(InsertedImage {
+            id: "image-1".to_string(),
+            original_path: "C:\\source.png".to_string(),
+            stored_path: "C:\\stored.png".to_string(),
+            width: Some(64),
+            height: Some(64),
+        });
+        source.links.push(Hyperlink {
+            id: "link-1".to_string(),
+            text: "docs".to_string(),
+            target: "https://example.com".to_string(),
+            kind: LinkKind::Web,
+        });
+
+        let note = note_from_template(source);
+
+        assert_eq!(note.content, "");
+        assert!(note.images.is_empty());
+        assert!(note.links.is_empty());
+        assert_eq!(note.settings.background_color, "#ff0000");
+        assert_eq!(note.settings.opacity, 0.75);
+        assert_eq!(note.window.x, Some(120));
+        assert_eq!(note.window.y, Some(160));
+        assert_eq!(note.window.width, 480.0);
+        assert_eq!(note.window.height, 320.0);
     }
 }

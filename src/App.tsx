@@ -72,6 +72,66 @@ export default function App() {
     });
   }, [note?.settings.alwaysOnTop]);
 
+  useEffect(() => {
+    if (!note?.id || !isTauriRuntime()) return;
+    let disposed = false;
+    const noteId = note.id;
+    const currentWindow = getCurrentWindow();
+
+    const applyWindowState = (windowState: Partial<Note["window"]>) => {
+      if (disposed) return;
+      setNote((current) =>
+        current && current.id === noteId
+          ? {
+              ...current,
+              window: {
+                ...current.window,
+                ...windowState
+              }
+            }
+          : current
+      );
+    };
+
+    const syncWindowState = async () => {
+      const scaleFactor = await currentWindow.scaleFactor();
+      const [position, size] = await Promise.all([currentWindow.outerPosition(), currentWindow.outerSize()]);
+      const logicalPosition = position.toLogical(scaleFactor);
+      const logicalSize = size.toLogical(scaleFactor);
+      applyWindowState({
+        x: Math.round(logicalPosition.x),
+        y: Math.round(logicalPosition.y),
+        width: Math.round(logicalSize.width),
+        height: Math.round(logicalSize.height)
+      });
+    };
+
+    const movedListener = currentWindow.onMoved(async ({ payload }) => {
+      const scaleFactor = await currentWindow.scaleFactor();
+      const logicalPosition = payload.toLogical(scaleFactor);
+      applyWindowState({
+        x: Math.round(logicalPosition.x),
+        y: Math.round(logicalPosition.y)
+      });
+    });
+    const resizedListener = currentWindow.onResized(async ({ payload }) => {
+      const scaleFactor = await currentWindow.scaleFactor();
+      const logicalSize = payload.toLogical(scaleFactor);
+      applyWindowState({
+        width: Math.round(logicalSize.width),
+        height: Math.round(logicalSize.height)
+      });
+    });
+
+    void syncWindowState().catch((error) => console.warn("KitNote could not sync window state.", error));
+
+    return () => {
+      disposed = true;
+      void movedListener.then((unlisten) => unlisten()).catch(() => undefined);
+      void resizedListener.then((unlisten) => unlisten()).catch(() => undefined);
+    };
+  }, [note?.id]);
+
   const updateSettings = useCallback((settings: NoteSettings) => {
     setNote((current) => (current ? { ...current, settings } : current));
   }, []);
