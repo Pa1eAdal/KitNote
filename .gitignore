@@ -1,0 +1,31 @@
+# Dependencies and caches
+node_modules/
+target/
+.vite/
+.turbo/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+src-tauri/target/
+src-tauri/gen/
+src-tauri/icons/icon.icns
+
+# Local/private data
+*.local
+.env
+.env.*
+notes.json
+*.backup.json
+*.corrupt-*.json
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+.agents/
+.codex/

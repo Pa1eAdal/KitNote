@@ -1,0 +1,36 @@
+{
+  "name": "kitnote",
+  "version": "0.1.0",
+  "description": "A lightweight local-first Windows sticky-note app built with Tauri.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "build": "tsc --noEmit && vite build",
+    "tauri:build": "tauri build",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@tauri-apps/api": "^2.6.0",
+    "@tauri-apps/plugin-dialog": "^2.2.2",
+    "katex": "^0.16.22",
+    "lucide-react": "^0.468.0",
+    "markdown-it": "^14.1.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.6.2",
+    "@types/markdown-it": "^14.1.2",
+    "@types/react": "^19.1.8",
+    "@types/react-dom": "^19.1.6",
+    "@vitejs/plugin-react": "^4.6.0",
+    "typescript": "^5.8.3",
+    "vite": "^7.0.0"
+  },
+  "overrides": {
+    "esbuild": "^0.28.1"
+  }
+}
