@@ -156,7 +156,7 @@ git push -u origin main
 
 - Image drag/drop depends on whether the Windows WebView exposes a real file path. The image button is the reliable path.
 - Images render inline in Markdown preview, but full direct manipulation is still a roadmap item.
-- Closing a note hides that window; a tray menu for restoring hidden notes is planned.
+- Closing a note closes that window; a tray menu for reopening saved notes is planned.
 - Window position and size fields exist in the data model, but full automatic save/restore still needs more work.
 - Risky local file links are currently blocked instead of showing a confirmation dialog.
 - MSI generation may require extra Windows build tooling.

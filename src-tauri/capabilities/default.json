@@ -3,5 +3,11 @@
   "identifier": "default",
   "description": "KitNote default desktop capability. Grants core window APIs and the file dialog picker only; note file access stays in Rust commands.",
   "windows": ["main", "note-*"],
-  "permissions": ["core:default", "dialog:default"]
+  "permissions": [
+    "core:default",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+    "core:window:allow-start-resize-dragging",
+    "dialog:default"
+  ]
 }

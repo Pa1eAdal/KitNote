@@ -3,6 +3,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { BottomToolbar } from "./components/BottomToolbar";
 import { LinkDialog } from "./components/LinkDialog";
+import { ResizeHandles } from "./components/ResizeHandles";
 import { SettingsMenu } from "./components/SettingsMenu";
 import { TopToolbar } from "./components/TopToolbar";
 import { renderMarkdown } from "./editor/markdown";
@@ -202,6 +203,7 @@ export default function App() {
       onDragOver={(event) => event.preventDefault()}
       onDrop={handleDrop}
     >
+      <ResizeHandles onError={setStatus} />
       <TopToolbar
         note={note}
         onCreateNote={createAnotherNote}

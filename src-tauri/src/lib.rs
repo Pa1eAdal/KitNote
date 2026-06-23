@@ -270,7 +270,7 @@ fn create_note_window(
     }
 
     let label = format!("note-{}", note.id);
-    let url = tauri::WebviewUrl::App(format!("index.html?noteId={}", note.id).into());
+    let url = tauri::WebviewUrl::App(format!("?noteId={}", note.id).into());
     append_log(
         &app,
         format!("Creating note window label={label} note_id={}", note.id),

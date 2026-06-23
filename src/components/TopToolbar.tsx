@@ -12,17 +12,32 @@ interface TopToolbarProps {
 }
 
 export function TopToolbar({ note, onCreateNote, newNoteDisabled = false, onToggleMenu }: TopToolbarProps) {
+  const startWindowDrag = async (event: React.PointerEvent<HTMLElement>) => {
+    if (event.button !== 0 || !isTauriRuntime()) return;
+    if ((event.target as HTMLElement).closest("button,input,select,textarea,a")) return;
+    event.preventDefault();
+    try {
+      await getCurrentWindow().startDragging();
+    } catch (error) {
+      console.error("KitNote drag failed", error);
+    }
+  };
+
   const closeWindow = async () => {
     if (isTauriRuntime()) {
-      await getCurrentWindow().hide();
+      try {
+        await getCurrentWindow().close();
+      } catch (error) {
+        console.error("KitNote close failed", error);
+      }
       return;
     }
     window.close();
   };
 
   return (
-    <div className="toolbar top-toolbar" data-tauri-drag-region>
-      <div className="toolbar-title" data-tauri-drag-region>
+    <div className="toolbar top-toolbar" onPointerDown={startWindowDrag}>
+      <div className="toolbar-title">
         {note.title}
       </div>
       <div className="toolbar-actions">
