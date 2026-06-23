@@ -29,7 +29,27 @@ export const saveNote = async (note: Note): Promise<AppData> => {
 
 export const createNoteWindow = async (source: Note): Promise<Note> => {
   if (isTauriRuntime()) {
-    return invokeCommand<Note>("create_note_window", { source });
+    const note = await invokeCommand<Note>("create_note_window", { source });
+    const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+    const label = `note-${note.id}`;
+    const windowUrl = `/?noteId=${encodeURIComponent(note.id)}`;
+    const webview = new WebviewWindow(label, {
+      url: windowUrl,
+      title: "KitNote",
+      width: note.window.width,
+      height: note.window.height,
+      minWidth: 260,
+      minHeight: 220,
+      resizable: true,
+      decorations: false,
+      transparent: true,
+      alwaysOnTop: note.settings.alwaysOnTop,
+      shadow: false,
+      focus: true
+    });
+
+    await waitForWindowCreation(webview, label);
+    return note;
   }
 
   return {
@@ -43,3 +63,29 @@ export const createNoteWindow = async (source: Note): Promise<Note> => {
     links: []
   };
 };
+
+async function waitForWindowCreation(webview: import("@tauri-apps/api/webviewWindow").WebviewWindow, label: string) {
+  await new Promise<void>((resolve, reject) => {
+    let settled = false;
+    const timeout = window.setTimeout(() => {
+      settle(() => reject(new Error(`Timed out while creating ${label}.`)));
+    }, 8000);
+
+    const settle = (finish: () => void) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timeout);
+      finish();
+    };
+
+    void webview.once("tauri://created", () => {
+      console.info("KitNote note window created", { label });
+      settle(resolve);
+    });
+
+    void webview.once<unknown>("tauri://error", (event) => {
+      console.error("KitNote note window creation failed", { label, error: event.payload });
+      settle(() => reject(new Error(String(event.payload ?? `Could not create ${label}.`))));
+    });
+  });
+}

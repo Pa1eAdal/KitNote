@@ -269,26 +269,7 @@ fn create_note_window(
         write_app_data(&app, &data)?;
     }
 
-    let label = format!("note-{}", note.id);
-    let url = tauri::WebviewUrl::App(format!("?noteId={}", note.id).into());
-    append_log(
-        &app,
-        format!("Creating note window label={label} note_id={}", note.id),
-    );
-    tauri::WebviewWindowBuilder::new(&app, label, url)
-        .title("KitNote")
-        .inner_size(note.window.width, note.window.height)
-        .min_inner_size(260.0, 220.0)
-        .resizable(true)
-        .decorations(false)
-        .transparent(true)
-        .always_on_top(note.settings.always_on_top)
-        .shadow(false)
-        .build()
-        .map_err(|error| {
-            append_log(&app, format!("Could not create a new note window: {error}"));
-            format!("Could not create a new note window: {error}")
-        })?;
+    append_log(&app, format!("Prepared new note data note_id={}", note.id));
 
     Ok(note)
 }

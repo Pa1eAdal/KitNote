@@ -34,8 +34,16 @@ export default function App() {
       .then((data) => {
         setAppData(data);
         const requestedNoteId = noteIdFromLocation();
-        const selected =
-          data.notes.find((item) => item.id === requestedNoteId) ?? data.notes[0] ?? createEmptyNote();
+        console.info("KitNote initializing window", { requestedNoteId });
+        const selected = requestedNoteId
+          ? data.notes.find((item) => item.id === requestedNoteId)
+          : data.notes[0] ?? createEmptyNote();
+        if (!selected) {
+          const message = `Note ${requestedNoteId} was not found in local data.`;
+          console.error("KitNote note initialization failed", { requestedNoteId, noteCount: data.notes.length });
+          setStatus(message);
+          return;
+        }
         setNote(selected);
         setStatus("Saved locally");
       })
