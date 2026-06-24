@@ -4,6 +4,8 @@ KitNote is a lightweight Windows sticky-note app built with Tauri v2, React, Typ
 
 This is a fresh Tauri rebuild, not a continuation of the old Electron app. The only old asset reused is the KitNote icon from `C:\Users\RuaKo\Documents\P_project\assets`.
 
+The current public test release is **KitNote v0.1.0**. It is an early release intended for testing rather than a final stable product.
+
 ## What Works In This Milestone
 
 - Borderless sticky-note window.
@@ -86,6 +88,20 @@ Expected release outputs after a successful Tauri build:
 - NSIS installer under `src-tauri\target\release\bundle\nsis\`.
 - MSI installer under `src-tauri\target\release\bundle\msi\` if the local Windows toolchain supports MSI builds.
 
+Run Rust checks from `src-tauri` or pass the manifest path from the project root:
+
+```powershell
+cargo fmt --manifest-path src-tauri\Cargo.toml -- --check
+cargo check --manifest-path src-tauri\Cargo.toml
+cargo test --manifest-path src-tauri\Cargo.toml
+```
+
+## Install And Uninstall
+
+For a normal installation, run the generated NSIS `.exe` or MSI `.msi` installer and follow the Windows prompts. Windows may show an unrecognized publisher warning because this early test release is not code-signed.
+
+To uninstall KitNote, open Windows **Settings > Apps > Installed apps**, find **KitNote**, and choose **Uninstall**. Uninstalling the application may leave local note data in the app data directory so it can be recovered or removed separately.
+
 ## Note Data Location
 
 KitNote stores notes in the app data directory resolved by Tauri. On Windows this is normally:
@@ -152,12 +168,19 @@ git push -u origin main
 - Create a second note with the `+` button.
 - Quit and relaunch to confirm notes persist.
 
+## Troubleshooting
+
+- `cargo metadata` or `cargo` not found: install Rust with Cargo and restart the terminal so `%USERPROFILE%\.cargo\bin` is on `PATH`.
+- `link.exe` not found: install Visual Studio 2022 Build Tools with the **Desktop development with C++** workload, then build from a Developer PowerShell or Developer Command Prompt.
+- Vite reports `EBUSY` under `src-tauri\target`: confirm the Vite watcher excludes Tauri build output, stop stale KitNote/Vite processes, and retry.
+- Windows warns about an unknown publisher: this test release is not digitally signed. Verify that the installer came from the KitNote release page before running it.
+- The build directory becomes very large: Rust debug, release, incremental, and installer artifacts are stored under `src-tauri\target`. After preserving release installers, run `cargo clean --manifest-path src-tauri\Cargo.toml` to reclaim space. The next build will take longer.
+
 ## Known Limitations
 
 - Image drag/drop depends on whether the Windows WebView exposes a real file path. The image button is the reliable path.
 - Images render inline in Markdown preview, but full direct manipulation is still a roadmap item.
 - Closing a note closes that window; a tray menu for reopening saved notes is planned.
-- Window position and size fields exist in the data model, but full automatic save/restore still needs more work.
 - Risky local file links are currently blocked instead of showing a confirmation dialog.
 - MSI generation may require extra Windows build tooling.
 - Rounded corners use a transparent, decoration-free Tauri window with the visible note inset in CSS. Native Windows shadows are disabled for transparent note windows to avoid a rectangular frame around rounded corners.
