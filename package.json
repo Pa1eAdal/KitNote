@@ -11,7 +11,8 @@
     "tauri:dev": "tauri dev",
     "build": "tsc --noEmit && vite build",
     "tauri:build": "tauri build",
-    "check": "tsc --noEmit"
+    "check": "tsc --noEmit",
+    "check:live-preview": "node scripts/check-live-preview-ranges.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

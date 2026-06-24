@@ -144,7 +144,10 @@ export function selectionTouchesRegion(
   selection: { ranges: readonly { from: number; to: number }[] },
   region: PreviewRegion
 ): boolean {
-  return selection.ranges.some(
-    (range) => range.from <= region.to + 1 && range.to >= region.from - 1
-  );
+  return selection.ranges.some((range) => {
+    if (range.from === range.to) {
+      return range.from >= region.from && range.from <= region.to;
+    }
+    return range.from < region.to && range.to > region.from;
+  });
 }
