@@ -3,7 +3,7 @@ import { DEFAULT_NOTE_HEIGHT, DEFAULT_NOTE_WIDTH } from "../types";
 
 export const defaultNoteSettings: NoteSettings = {
   alwaysOnTop: true,
-  backgroundColor: "#fff3a6",
+  backgroundColor: "#FFF4A8",
   fontColor: "#231f1a",
   fontFamily: "Segoe UI, system-ui, sans-serif",
   fontSize: 16,

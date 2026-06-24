@@ -12,7 +12,7 @@ import { createNoteWindow, loadAppData, saveNote } from "./notes/store";
 import type { AppData, CopiedImage, Hyperlink, Note, NoteSettings } from "./types";
 import { invokeCommand, isTauriRuntime } from "./utils/tauri";
 
-const appVersion = "0.1.0";
+const appVersion = "0.1.1";
 const autosaveDelayMs = 450;
 
 function noteIdFromLocation(): string | null {
@@ -277,6 +277,7 @@ export default function App() {
         onCreateNote={createAnotherNote}
         newNoteDisabled={creatingNote}
         onToggleMenu={() => setMenuOpen((open) => !open)}
+        onTitleChange={(title) => setNote((current) => (current ? { ...current, title } : current))}
       />
       {menuOpen ? (
         <SettingsMenu settings={note.settings} appVersion={appVersion} onSettingsChange={updateSettings} />

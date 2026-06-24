@@ -37,7 +37,7 @@ textarea {
   height: calc(100vh - 20px);
   place-items: center;
   border-radius: 18px;
-  background: rgba(255, 243, 166, 0.96);
+  background: rgba(255, 244, 168, 0.96);
 }
 
 .note-shell {
@@ -173,15 +173,33 @@ textarea {
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
-  cursor: grab;
+  cursor: text;
+}
+
+.toolbar-title-input {
+  width: 100%;
+  min-width: 0;
+  height: 26px;
+  flex: 1;
+  padding: 0 7px;
+  border: 1px solid rgba(67, 55, 25, 0.2);
+  border-radius: 6px;
+  outline: 0;
+  color: #231f1a;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+}
+
+.toolbar-title-input:focus {
+  border-color: rgba(67, 55, 25, 0.42);
+  box-shadow: 0 0 0 2px rgba(255, 244, 168, 0.72);
 }
 
 .top-toolbar {
   cursor: grab;
 }
 
-.top-toolbar:active,
-.toolbar-title:active {
+.top-toolbar:active {
   cursor: grabbing;
 }
 

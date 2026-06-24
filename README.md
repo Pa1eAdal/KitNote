@@ -4,7 +4,9 @@ KitNote is a lightweight Windows sticky-note app built with Tauri v2, React, Typ
 
 This is a fresh Tauri rebuild, not a continuation of the old Electron app. The only old asset reused is the KitNote icon from `C:\Users\RuaKo\Documents\P_project\assets`.
 
-The current public test release is **KitNote v0.1.0**. It is an early release intended for testing rather than a final stable product.
+The current public test release is **KitNote v0.1.1**. It is an early release intended for testing rather than a final stable product.
+
+This software was fully generated with OpenAI Codex. The development environment identifies the model used for this work as GPT-5; it would be inaccurate to label it GPT-5.5 without verified provenance.
 
 ## What Works In This Milestone
 
@@ -15,6 +17,7 @@ The current public test release is **KitNote v0.1.0**. It is an early release in
 - TeX math rendering through KaTeX, including inline `$E = mc^2$` and block `$$...$$` syntax.
 - Configurable note color, font color, font size, font family, opacity, and corner radius.
 - Multiple note creation from the `+` button.
+- Per-note titles that can be renamed by clicking the title in the top toolbar.
 - Local JSON persistence.
 - Image insertion from a file picker, copied into KitNote app data.
 - Drag-and-drop image path support when the desktop WebView exposes a real file path.
@@ -118,6 +121,8 @@ Inserted images are copied under:
 
 These files are private user data and should not be committed to Git.
 
+Changing the default color affects new or fresh notes, but existing persisted notes keep their saved color. To reset test data, first close KitNote and back up `%APPDATA%\com.kitnote.desktop\notes.json`, then remove that file. KitNote will create a fresh yellow note the next time it starts.
+
 ## Icons
 
 Source icon files are expected at:
@@ -189,3 +194,7 @@ git push -u origin main
 ## Future Work
 
 See `ROADMAP.md`.
+
+## License
+
+KitNote is available under the [MIT License](LICENSE).

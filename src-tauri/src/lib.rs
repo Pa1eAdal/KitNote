@@ -107,7 +107,7 @@ fn now_stamp() -> String {
 fn default_note_settings() -> NoteSettings {
     NoteSettings {
         always_on_top: true,
-        background_color: "#fff3a6".to_string(),
+        background_color: "#FFF4A8".to_string(),
         font_color: "#231f1a".to_string(),
         font_family: "Segoe UI, system-ui, sans-serif".to_string(),
         font_size: 16,
@@ -447,8 +447,17 @@ mod tests {
     }
 
     #[test]
+    fn fresh_notes_use_sticky_note_yellow() {
+        let note = empty_note(default_note_settings());
+
+        assert_eq!(note.settings.background_color, "#FFF4A8");
+        assert_eq!(note.title, "Untitled note");
+    }
+
+    #[test]
     fn note_template_copies_settings_and_window_but_not_content() {
         let mut source = empty_note(default_note_settings());
+        source.title = "Source note title".to_string();
         source.content = "do not copy this text".to_string();
         source.settings.background_color = "#ff0000".to_string();
         source.settings.opacity = 0.75;
@@ -472,6 +481,7 @@ mod tests {
 
         let note = note_from_template(source);
 
+        assert_eq!(note.title, "Untitled note");
         assert_eq!(note.content, "");
         assert!(note.images.is_empty());
         assert!(note.links.is_empty());
