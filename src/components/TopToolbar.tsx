@@ -163,7 +163,7 @@ export function TopToolbar({
         <IconButton label="New note" onClick={onCreateNote} disabled={newNoteDisabled}>
           <Plus size={16} />
         </IconButton>
-        <IconButton label="Settings" onClick={onToggleMenu}>
+        <IconButton label="Settings" data-settings-toggle onClick={onToggleMenu}>
           <Menu size={16} />
         </IconButton>
         <IconButton label="Close note" onClick={closeWindow}>

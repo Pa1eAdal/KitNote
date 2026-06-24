@@ -6,7 +6,36 @@ const localPathPattern = /^(?:[a-zA-Z]:[\\/]|\\\\|\/)/;
 
 export const isLocalPath = (value: string): boolean => localPathPattern.test(value);
 
+export interface MathPreview {
+  html: string;
+  error: string | null;
+}
+
+export function renderMathPreview(source: string, displayMode: boolean): MathPreview {
+  try {
+    return {
+      html: katex.renderToString(source, {
+        displayMode,
+        throwOnError: true,
+        strict: "warn",
+        trust: false
+      }),
+      error: null
+    };
+  } catch (error) {
+    return {
+      html: "",
+      error: error instanceof Error ? error.message : "Invalid TeX"
+    };
+  }
+}
+
 function renderMath(source: string, displayMode: boolean): string {
+  const preview = renderMathPreview(source, displayMode);
+  if (!preview.error) {
+    return preview.html;
+  }
+
   try {
     return katex.renderToString(source, {
       displayMode,
@@ -112,3 +141,4 @@ markdown.renderer.rules.link_open = (tokens, idx, options, env, self) => {
 };
 
 export const renderMarkdown = (source: string): string => markdown.render(source);
+export const renderMarkdownInline = (source: string): string => markdown.renderInline(source);

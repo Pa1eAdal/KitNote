@@ -1,18 +1,18 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { BottomToolbar } from "./components/BottomToolbar";
 import { LinkDialog } from "./components/LinkDialog";
+import { LivePreviewEditor, type LivePreviewEditorHandle } from "./components/LivePreviewEditor";
 import { ResizeHandles } from "./components/ResizeHandles";
 import { SettingsMenu } from "./components/SettingsMenu";
 import { TopToolbar } from "./components/TopToolbar";
-import { renderMarkdown } from "./editor/markdown";
 import { createEmptyNote, defaultNoteSettings } from "./settings/defaults";
 import { createNoteWindow, loadAppData, saveNote } from "./notes/store";
 import type { AppData, CopiedImage, Hyperlink, Note, NoteSettings } from "./types";
 import { invokeCommand, isTauriRuntime } from "./utils/tauri";
 
-const appVersion = "0.1.1";
+const appVersion = "0.2.0";
 const autosaveDelayMs = 450;
 
 function noteIdFromLocation(): string | null {
@@ -20,10 +20,9 @@ function noteIdFromLocation(): string | null {
 }
 
 export default function App() {
-  const editorRef = useRef<HTMLTextAreaElement | null>(null);
+  const editorRef = useRef<LivePreviewEditorHandle | null>(null);
   const [appData, setAppData] = useState<AppData | null>(null);
   const [note, setNote] = useState<Note | null>(null);
-  const [preview, setPreview] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
@@ -132,32 +131,42 @@ export default function App() {
     };
   }, [note?.id]);
 
+  useEffect(() => {
+    if (!menuOpen) return;
+
+    const closeOnOutsidePointer = (event: PointerEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest(".settings-menu") || target?.closest("[data-settings-toggle]")) {
+        return;
+      }
+      setMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer, true);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer, true);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menuOpen]);
+
   const updateSettings = useCallback((settings: NoteSettings) => {
     setNote((current) => (current ? { ...current, settings } : current));
   }, []);
 
-  const renderedHtml = useMemo(() => renderMarkdown(note?.content ?? ""), [note?.content]);
-
   const insertText = useCallback((before: string, after = "") => {
-    const textarea = editorRef.current;
-    setNote((current) => {
-      if (!current) return current;
-      if (!textarea) {
-        return { ...current, content: `${current.content}${before}${after}` };
-      }
-      const start = textarea.selectionStart;
-      const end = textarea.selectionEnd;
-      const selected = current.content.slice(start, end);
-      const nextContent = `${current.content.slice(0, start)}${before}${selected}${after}${current.content.slice(
-        end
-      )}`;
-      window.requestAnimationFrame(() => {
-        textarea.focus();
-        textarea.selectionStart = start + before.length;
-        textarea.selectionEnd = start + before.length + selected.length;
-      });
-      return { ...current, content: nextContent };
-    });
+    if (editorRef.current) {
+      editorRef.current.insertText(before, after);
+      return;
+    }
+    setNote((current) =>
+      current ? { ...current, content: `${current.content}${before}${after}` } : current
+    );
   }, []);
 
   const insertImageFromPath = useCallback(
@@ -226,18 +235,14 @@ export default function App() {
     setLinkDialogOpen(false);
   }, []);
 
-  const handlePreviewClick = async (event: React.MouseEvent<HTMLElement>) => {
-    const anchor = (event.target as HTMLElement).closest<HTMLAnchorElement>("a[data-kitnote-link]");
-    if (!anchor) return;
-    event.preventDefault();
-    const target = anchor.dataset.kitnoteLink ?? anchor.href;
+  const openLinkTarget = useCallback(async (target: string) => {
     const kind = /^https?:\/\//i.test(target) ? "web" : "file";
     try {
       await invokeCommand<void>("open_link_target", { target, kind });
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not open link");
     }
-  };
+  }, []);
 
   const handleDrop = async (event: React.DragEvent<HTMLElement>) => {
     event.preventDefault();
@@ -283,29 +288,13 @@ export default function App() {
         <SettingsMenu settings={note.settings} appVersion={appVersion} onSettingsChange={updateSettings} />
       ) : null}
       <section className="editor-frame">
-        <div className="editor-tabs" role="tablist">
-          <button className={!preview ? "active" : ""} onClick={() => setPreview(false)}>
-            Edit
-          </button>
-          <button className={preview ? "active" : ""} onClick={() => setPreview(true)}>
-            Preview
-          </button>
-        </div>
-        {preview ? (
-          <article
-            className="markdown-preview"
-            onDoubleClick={handlePreviewClick}
-            dangerouslySetInnerHTML={{ __html: renderedHtml }}
-          />
-        ) : (
-          <textarea
-            ref={editorRef}
-            value={note.content}
-            spellCheck
-            onChange={(event) => setNote({ ...note, content: event.currentTarget.value })}
-            placeholder="Write Markdown, TeX, links, and notes..."
-          />
-        )}
+        <LivePreviewEditor
+          key={note.id}
+          ref={editorRef}
+          value={note.content}
+          onChange={(content) => setNote((current) => (current ? { ...current, content } : current))}
+          onOpenLink={openLinkTarget}
+        />
       </section>
       <BottomToolbar
         settings={note.settings}

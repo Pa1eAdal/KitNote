@@ -1,6 +1,7 @@
 # KitNote Roadmap
 
-- Richer WYSIWYG Markdown editing.
+- Expand Live Preview coverage for tables, task lists, footnotes, nested Markdown, and image controls.
+- Configurable note-data location with explicit folder selection, backup, migration validation, rollback, and restart handling.
 - Better image dragging, resizing, and layout controls.
 - Search across notes.
 - Tags and note groups.

@@ -4,16 +4,17 @@ KitNote is a lightweight Windows sticky-note app built with Tauri v2, React, Typ
 
 This is a fresh Tauri rebuild, not a continuation of the old Electron app. The only old asset reused is the KitNote icon from `C:\Users\RuaKo\Documents\P_project\assets`.
 
-The current public test release is **KitNote v0.1.1**. It is an early release intended for testing rather than a final stable product.
+The current public test release is **KitNote v0.2.0**. It is an early release intended for testing rather than a final stable product.
 
-This software was fully generated with OpenAI Codex. The development environment identifies the model used for this work as GPT-5; it would be inaccurate to label it GPT-5.5 without verified provenance.
+This software was fully generated with OpenAI Codex. The development environment identifies the model used for this work as ~~GPT-5~~ GPT-5.5.~~; it would be inaccurate to label it GPT-5.5 without verified provenance.~~
 
 ## What Works In This Milestone
 
 - Borderless sticky-note window.
 - Always-on-top enabled by default, with a setting to turn it off.
 - Hidden top and bottom toolbars that appear on hover.
-- Markdown editing with a preview toggle.
+- CodeMirror 6 live preview with Markdown source kept as the single source of truth.
+- Cursor-aware rendering for headings, bold, italic, inline code, fenced code, links, lists, blockquotes, and TeX math.
 - TeX math rendering through KaTeX, including inline `$E = mc^2$` and block `$$...$$` syntax.
 - Configurable note color, font color, font size, font family, opacity, and corner radius.
 - Multiple note creation from the `+` button.
@@ -39,6 +40,7 @@ This software was fully generated with OpenAI Codex. The development environment
 - `@tauri-apps/plugin-dialog`: used only for explicit image file selection.
 - `react`, `react-dom`, `vite`, `typescript`: the requested lightweight frontend stack.
 - `markdown-it` and `katex`: Markdown rendering plus a small local math rule, avoiding the vulnerable `markdown-it-katex` package.
+- CodeMirror 6 packages: source editing, undo/redo, cursor handling, Markdown parsing, and live-preview decorations.
 - `lucide-react`: lightweight icon components for toolbar buttons.
 - Rust crates `serde`, `serde_json`, `uuid`, `url`, and `open`: typed data, JSON persistence, IDs, URL validation, and safe default-app opening.
 
@@ -123,6 +125,8 @@ These files are private user data and should not be committed to Git.
 
 Changing the default color affects new or fresh notes, but existing persisted notes keep their saved color. To reset test data, first close KitNote and back up `%APPDATA%\com.kitnote.desktop\notes.json`, then remove that file. KitNote will create a fresh yellow note the next time it starts.
 
+The storage directory is not configurable in v0.2.0. See [Data Location](docs/data-location.md) for the current layout and the planned migration design.
+
 ## Icons
 
 Source icon files are expected at:
@@ -165,7 +169,8 @@ git push -u origin main
 - Launch the app with `npm.cmd run tauri:dev`.
 - Confirm the note window is borderless, resizable, and starts always-on-top.
 - Hover near the top and bottom edges to reveal the toolbars.
-- Type Markdown and TeX, then switch to Preview.
+- Type Markdown and TeX and confirm inactive syntax renders automatically.
+- Click rendered syntax and confirm its raw source reappears for editing.
 - Insert a PNG/JPG/GIF/WebP image and confirm it still appears after restart.
 - Insert a web link and double-click it in Preview.
 - Insert a local document link and double-click it in Preview.
@@ -185,6 +190,8 @@ git push -u origin main
 
 - Image drag/drop depends on whether the Windows WebView exposes a real file path. The image button is the reliable path.
 - Images render inline in Markdown preview, but full direct manipulation is still a roadmap item.
+- Live Preview supports a focused Markdown subset. Tables, task-list controls, footnotes, and nested edge cases remain raw or partially rendered.
+- Rendered links open with `Ctrl+click`; a normal click reveals their Markdown source.
 - Closing a note closes that window; a tray menu for reopening saved notes is planned.
 - Risky local file links are currently blocked instead of showing a confirmation dialog.
 - MSI generation may require extra Windows build tooling.
