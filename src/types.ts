@@ -55,6 +55,11 @@ export interface AppData {
   notes: Note[];
 }
 
+export interface LoadAppDataResult {
+  data: AppData;
+  warning?: string;
+}
+
 export interface CopiedImage {
   id: string;
   originalPath: string;

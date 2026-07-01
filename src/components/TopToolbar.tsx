@@ -12,6 +12,8 @@ interface TopToolbarProps {
   note: Note;
   onCreateNote: () => void;
   newNoteDisabled?: boolean;
+  onCloseNote: () => void;
+  closeDisabled?: boolean;
   onToggleMenu: () => void;
   onTitleChange: (title: string) => void;
 }
@@ -20,6 +22,8 @@ export function TopToolbar({
   note,
   onCreateNote,
   newNoteDisabled = false,
+  onCloseNote,
+  closeDisabled = false,
   onToggleMenu,
   onTitleChange
 }: TopToolbarProps) {
@@ -55,18 +59,6 @@ export function TopToolbar({
     if ((event.target as HTMLElement).closest("button,input,select,textarea,a")) return;
     event.preventDefault();
     void dragCurrentWindow();
-  };
-
-  const closeWindow = async () => {
-    if (isTauriRuntime()) {
-      try {
-        await getCurrentWindow().close();
-      } catch (error) {
-        console.error("KitNote close failed", error);
-      }
-      return;
-    }
-    window.close();
   };
 
   const commitTitle = () => {
@@ -166,7 +158,7 @@ export function TopToolbar({
         <IconButton label="Settings" data-settings-toggle onClick={onToggleMenu}>
           <Menu size={16} />
         </IconButton>
-        <IconButton label="Close note" onClick={closeWindow}>
+        <IconButton label="Close note" onClick={onCloseNote} disabled={closeDisabled}>
           <X size={16} />
         </IconButton>
       </div>

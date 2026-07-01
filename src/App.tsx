@@ -8,7 +8,7 @@ import { ResizeHandles } from "./components/ResizeHandles";
 import { SettingsMenu } from "./components/SettingsMenu";
 import { TopToolbar } from "./components/TopToolbar";
 import { createEmptyNote, defaultNoteSettings } from "./settings/defaults";
-import { createNoteWindow, loadAppData, saveNote } from "./notes/store";
+import { createNoteWindow, loadAppData, restoreSavedNoteWindows, saveNote } from "./notes/store";
 import type { AppData, CopiedImage, Hyperlink, Note, NoteSettings } from "./types";
 import { invokeCommand, isTauriRuntime } from "./utils/tauri";
 
@@ -21,16 +21,53 @@ function noteIdFromLocation(): string | null {
 
 export default function App() {
   const editorRef = useRef<LivePreviewEditorHandle | null>(null);
+  const noteRef = useRef<Note | null>(null);
+  const persistedUpdatedAtRef = useRef<string | null>(null);
+  const autosaveTimerRef = useRef<number | null>(null);
+  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const closeInProgressRef = useRef(false);
+  const allowCloseRef = useRef(false);
+  const restoreStartedRef = useRef(false);
   const [appData, setAppData] = useState<AppData | null>(null);
   const [note, setNote] = useState<Note | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [linkDialogOpen, setLinkDialogOpen] = useState(false);
   const [creatingNote, setCreatingNote] = useState(false);
+  const [closingNote, setClosingNote] = useState(false);
   const [status, setStatus] = useState("Loading KitNote...");
+
+  noteRef.current = note;
+
+  const queueSave = useCallback((snapshot: Note): Promise<AppData> => {
+    let resolveResult: (data: AppData) => void;
+    let rejectResult: (error: unknown) => void;
+    const result = new Promise<AppData>((resolve, reject) => {
+      resolveResult = resolve;
+      rejectResult = reject;
+    });
+
+    saveQueueRef.current = saveQueueRef.current
+      .catch(() => undefined)
+      .then(async () => {
+        try {
+          const next = { ...snapshot, updatedAt: new Date().toISOString() };
+          const data = await saveNote(next, persistedUpdatedAtRef.current);
+          persistedUpdatedAtRef.current = next.updatedAt;
+          setAppData(data);
+          setStatus("Saved locally");
+          resolveResult(data);
+        } catch (error) {
+          setStatus(error instanceof Error ? error.message : "Save failed");
+          rejectResult(error);
+        }
+      });
+
+    return result;
+  }, []);
 
   useEffect(() => {
     loadAppData()
-      .then((data) => {
+      .then(({ data, warning }) => {
         setAppData(data);
         const requestedNoteId = noteIdFromLocation();
         console.info("KitNote initializing window", { requestedNoteId });
@@ -43,26 +80,94 @@ export default function App() {
           setStatus(message);
           return;
         }
+        persistedUpdatedAtRef.current = selected.updatedAt;
         setNote(selected);
-        setStatus("Saved locally");
+        setStatus(warning ?? "Saved locally");
+
+        if (
+          !restoreStartedRef.current &&
+          isTauriRuntime() &&
+          getCurrentWindow().label === "main" &&
+          data.globalSettings.restoreAllNotesOnLaunch
+        ) {
+          restoreStartedRef.current = true;
+          void restoreSavedNoteWindows(data, selected.id)
+            .then((count) => {
+              if (!warning && count > 0) {
+                setStatus(`Restored ${count} saved ${count === 1 ? "note" : "notes"}`);
+              }
+            })
+            .catch((error) =>
+              setStatus(error instanceof Error ? error.message : "Could not restore saved notes")
+            );
+        }
       })
       .catch((error) => setStatus(error instanceof Error ? error.message : "Unable to load notes"));
   }, []);
 
   useEffect(() => {
     if (!note) return;
-    const timer = window.setTimeout(() => {
-      const next = { ...note, updatedAt: new Date().toISOString() };
-      saveNote(next)
-        .then((data) => {
-          setAppData(data);
-          setStatus("Saved locally");
-        })
-        .catch((error) => setStatus(error instanceof Error ? error.message : "Save failed"));
+    if (autosaveTimerRef.current !== null) {
+      window.clearTimeout(autosaveTimerRef.current);
+    }
+    autosaveTimerRef.current = window.setTimeout(() => {
+      autosaveTimerRef.current = null;
+      void queueSave(note).catch(() => undefined);
     }, autosaveDelayMs);
 
-    return () => window.clearTimeout(timer);
-  }, [note]);
+    return () => {
+      if (autosaveTimerRef.current !== null) {
+        window.clearTimeout(autosaveTimerRef.current);
+        autosaveTimerRef.current = null;
+      }
+    };
+  }, [note, queueSave]);
+
+  const closeCurrentNote = useCallback(async () => {
+    if (closeInProgressRef.current) return;
+    if (!isTauriRuntime()) {
+      window.close();
+      return;
+    }
+
+    closeInProgressRef.current = true;
+    setClosingNote(true);
+    if (autosaveTimerRef.current !== null) {
+      window.clearTimeout(autosaveTimerRef.current);
+      autosaveTimerRef.current = null;
+    }
+
+    try {
+      const latest = noteRef.current;
+      if (latest) {
+        setStatus("Saving before close...");
+        await queueSave(latest);
+      }
+      allowCloseRef.current = true;
+      await getCurrentWindow().close();
+    } catch (error) {
+      allowCloseRef.current = false;
+      closeInProgressRef.current = false;
+      setClosingNote(false);
+      setStatus(
+        error instanceof Error
+          ? `Note stayed open because saving failed: ${error.message}`
+          : "Note stayed open because saving failed"
+      );
+    }
+  }, [queueSave]);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    const closeListener = getCurrentWindow().onCloseRequested((event) => {
+      if (allowCloseRef.current) return;
+      event.preventDefault();
+      void closeCurrentNote();
+    });
+    return () => {
+      void closeListener.then((unlisten) => unlisten()).catch(() => undefined);
+    };
+  }, [closeCurrentNote]);
 
   useEffect(() => {
     if (!note || !isTauriRuntime()) return;
@@ -211,6 +316,7 @@ export default function App() {
     try {
       const next = await createNoteWindow(note);
       if (!isTauriRuntime()) {
+        persistedUpdatedAtRef.current = null;
         setNote(next);
       }
       setStatus("New note created");
@@ -281,6 +387,8 @@ export default function App() {
         note={note}
         onCreateNote={createAnotherNote}
         newNoteDisabled={creatingNote}
+        onCloseNote={closeCurrentNote}
+        closeDisabled={closingNote}
         onToggleMenu={() => setMenuOpen((open) => !open)}
         onTitleChange={(title) => setNote((current) => (current ? { ...current, title } : current))}
       />
