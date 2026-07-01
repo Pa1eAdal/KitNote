@@ -135,7 +135,7 @@ KitNote also maintains:
 
 Only one KitNote process writes this directory. A second launch focuses an existing KitNote window and exits. Saves use unique temporary files, a process-wide plus operating-system lock, stale-version checks, and atomic replacement. Read failures stop saves instead of resetting data.
 
-Closing a note is not deletion. X saves the latest edit/window state before closing. When `restoreAllNotesOnLaunch` is enabled (the current default), every saved note opens again the next time KitNote starts.
+Closing a note is not deletion. X and native Windows close requests use one path: save the latest edit/window state, then destroy only that window. When `restoreAllNotesOnLaunch` is enabled (the current default), every saved note opens again the next time KitNote starts. Several windows at startup therefore mean that several notes are still saved, including notes created during earlier tests.
 
 Changing the default color affects new or fresh notes, but existing persisted notes keep their saved color. To reset test data, first close KitNote and back up `%APPDATA%\com.kitnote.desktop\notes.json`, then remove that file. KitNote will create a fresh yellow note the next time it starts.
 
@@ -208,7 +208,7 @@ git push -u origin main
 - Live Preview supports a focused Markdown subset. Tables, task-list controls, footnotes, and nested edge cases remain raw or partially rendered.
 - Rendered links open with `Ctrl+click`; a normal click reveals their Markdown source.
 - Closing a note closes that window; a tray menu for reopening saved notes is planned.
-- Closed notes return on the next app launch while restore-all is enabled; an immediate tray/list reopen action is still planned.
+- Closed notes return on the next app launch while restore-all is enabled; X currently means "close for this session," not "hide permanently" or "delete." An immediate tray/list reopen action and persistent hidden state are still planned.
 - Local file links outside the ordinary-document/image safe list are blocked instead of showing a confirmation dialog.
 - MSI generation may require extra Windows build tooling.
 - Rounded corners use a transparent, decoration-free Tauri window with the visible note inset in CSS. Native Windows shadows are disabled for transparent note windows to avoid a rectangular frame around rounded corners.

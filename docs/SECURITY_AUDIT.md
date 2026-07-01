@@ -58,6 +58,8 @@ Post-remediation open finding totals:
 - **Finding 3 fixed:** save/create return ordinary read errors without writing. Startup preserves malformed JSON under a unique corrupt filename; update operations preserve a recovery copy and refuse replacement. Successful saves maintain `notes.backup.json`.
 - **Finding 4 fixed for the requested scope:** the main window honors `restoreAllNotesOnLaunch` and restores every saved secondary note window at startup. Close does not delete notes.
 - **Finding 5 fixed:** frontend saves are serialized, stale note versions are rejected, and X/native close requests flush the latest note state before closing.
+- **Finding 5 regression fix:** the save queue now returns the real queued operation instead of a separately settled promise. Save and close waits are bounded, close state always resets in `finally`, and frontend/Rust diagnostics record note IDs and window labels without note content.
+- **Native close regression fix:** Tauri's `onCloseRequested` implementation completes an allowed close with `window.destroy()`. KitNote now grants the narrow `core:window:allow-destroy` permission and routes both X and native close through one save-then-destroy path without recursive close interception.
 
 ## Findings
 
@@ -348,6 +350,7 @@ No automatic network transmission of note contents was found. Remote Markdown im
 | `git ... check-ignore -v ...` | Confirmed target, dist, node_modules, temp, logs, notes, and SQLite patterns are ignored |
 | `npm.cmd run check` | Passed |
 | `npm.cmd run check:live-preview` | Passed |
+| `npm.cmd run check:save-queue` | Passed; serialized tasks recover after rejection, failed close state resets, and unresolved operations time out |
 | `npm.cmd run build` | Passed before and after remediation; Vite warned about a 1,111.59 kB JavaScript chunk and ineffective dynamic code splitting |
 | `cargo fmt --manifest-path src-tauri\Cargo.toml -- --check` | Passed |
 | `cargo check --manifest-path src-tauri\Cargo.toml` | Passed |
@@ -362,6 +365,7 @@ No automatic network transmission of note contents was found. Remote Markdown im
 | Directory size measurement | `src-tauri/target` measured at 3.719 GiB after Rust checks |
 | `npm.cmd run tauri -- info` | Environment portion succeeded, but the command did not terminate within 120 seconds and was stopped |
 | Isolated `tauri dev` using identifier `com.kitnote.codex-runtime` | Launched successfully with no Rust/Tauri terminal error |
+| Isolated runtime save diagnostics | Logged matching `Save started` and `Save succeeded` records without note content |
 | Second isolated `KitNote.exe` launch | Passed; second process exited and the running process count remained one |
 
 The first sandboxed `npm audit` attempt could not reach the npm advisory endpoint. It was rerun with approved network/cache access and completed successfully. `cargo audit` can be installed later with:

@@ -8,12 +8,21 @@ import { ResizeHandles } from "./components/ResizeHandles";
 import { SettingsMenu } from "./components/SettingsMenu";
 import { TopToolbar } from "./components/TopToolbar";
 import { createEmptyNote, defaultNoteSettings } from "./settings/defaults";
+import { SerializedTaskQueue, withClosingState, withTimeout } from "./notes/saveQueue";
 import { createNoteWindow, loadAppData, restoreSavedNoteWindows, saveNote } from "./notes/store";
 import type { AppData, CopiedImage, Hyperlink, Note, NoteSettings } from "./types";
 import { invokeCommand, isTauriRuntime } from "./utils/tauri";
 
 const appVersion = "0.2.0";
 const autosaveDelayMs = 450;
+const closeSaveTimeoutMs = 10_000;
+const windowCloseTimeoutMs = 5_000;
+
+function logClose(message: string, details: Record<string, unknown>) {
+  if (import.meta.env.DEV) {
+    console.info(`[KitNote close] ${message}`, details);
+  }
+}
 
 function noteIdFromLocation(): string | null {
   return new URLSearchParams(window.location.search).get("noteId");
@@ -24,9 +33,8 @@ export default function App() {
   const noteRef = useRef<Note | null>(null);
   const persistedUpdatedAtRef = useRef<string | null>(null);
   const autosaveTimerRef = useRef<number | null>(null);
-  const saveQueueRef = useRef<Promise<void>>(Promise.resolve());
+  const saveQueueRef = useRef(new SerializedTaskQueue());
   const closeInProgressRef = useRef(false);
-  const allowCloseRef = useRef(false);
   const restoreStartedRef = useRef(false);
   const [appData, setAppData] = useState<AppData | null>(null);
   const [note, setNote] = useState<Note | null>(null);
@@ -39,30 +47,27 @@ export default function App() {
   noteRef.current = note;
 
   const queueSave = useCallback((snapshot: Note): Promise<AppData> => {
-    let resolveResult: (data: AppData) => void;
-    let rejectResult: (error: unknown) => void;
-    const result = new Promise<AppData>((resolve, reject) => {
-      resolveResult = resolve;
-      rejectResult = reject;
+    return saveQueueRef.current.enqueue(async () => {
+      const windowLabel = isTauriRuntime() ? getCurrentWindow().label : "browser";
+      const next = { ...snapshot, updatedAt: new Date().toISOString() };
+      logClose("Rust save command starts", { noteId: snapshot.id, windowLabel });
+      try {
+        const data = await saveNote(next, persistedUpdatedAtRef.current);
+        persistedUpdatedAtRef.current = next.updatedAt;
+        setAppData(data);
+        setStatus("Saved locally");
+        logClose("Rust save command succeeds", { noteId: snapshot.id, windowLabel });
+        return data;
+      } catch (error) {
+        setStatus(error instanceof Error ? error.message : "Save failed");
+        console.error("[KitNote close] Rust save command fails", {
+          noteId: snapshot.id,
+          windowLabel,
+          error
+        });
+        throw error;
+      }
     });
-
-    saveQueueRef.current = saveQueueRef.current
-      .catch(() => undefined)
-      .then(async () => {
-        try {
-          const next = { ...snapshot, updatedAt: new Date().toISOString() };
-          const data = await saveNote(next, persistedUpdatedAtRef.current);
-          persistedUpdatedAtRef.current = next.updatedAt;
-          setAppData(data);
-          setStatus("Saved locally");
-          resolveResult(data);
-        } catch (error) {
-          setStatus(error instanceof Error ? error.message : "Save failed");
-          rejectResult(error);
-        }
-      });
-
-    return result;
   }, []);
 
   useEffect(() => {
@@ -130,38 +135,61 @@ export default function App() {
       return;
     }
 
+    const windowLabel = getCurrentWindow().label;
+    const closingNoteId = noteRef.current?.id ?? null;
     closeInProgressRef.current = true;
-    setClosingNote(true);
-    if (autosaveTimerRef.current !== null) {
-      window.clearTimeout(autosaveTimerRef.current);
-      autosaveTimerRef.current = null;
-    }
-
+    logClose("close starts", { noteId: closingNoteId, windowLabel });
     try {
-      const latest = noteRef.current;
-      if (latest) {
-        setStatus("Saving before close...");
-        await queueSave(latest);
-      }
-      allowCloseRef.current = true;
-      await getCurrentWindow().close();
+      await withClosingState(setClosingNote, async () => {
+        if (autosaveTimerRef.current !== null) {
+          window.clearTimeout(autosaveTimerRef.current);
+          autosaveTimerRef.current = null;
+        }
+
+        const latest = noteRef.current;
+        if (latest) {
+          setStatus("Saving before close...");
+          logClose("pending autosave flush starts", { noteId: latest.id, windowLabel });
+          await withTimeout(
+            queueSave(latest),
+            closeSaveTimeoutMs,
+            "Saving this note timed out. The note stayed open so you can retry."
+          );
+          logClose("pending autosave flush succeeds", { noteId: latest.id, windowLabel });
+        }
+
+        logClose("window destroy is called", { noteId: latest?.id ?? null, windowLabel });
+        await withTimeout(
+          getCurrentWindow().destroy(),
+          windowCloseTimeoutMs,
+          "Windows did not confirm the close request. The note stayed open so you can retry."
+        );
+      });
     } catch (error) {
-      allowCloseRef.current = false;
-      closeInProgressRef.current = false;
-      setClosingNote(false);
+      console.error("[KitNote close] close is cancelled", {
+        noteId: closingNoteId,
+        windowLabel,
+        error
+      });
       setStatus(
         error instanceof Error
-          ? `Note stayed open because saving failed: ${error.message}`
-          : "Note stayed open because saving failed"
+          ? `Note stayed open: ${error.message}`
+          : "Note stayed open because the close attempt failed"
       );
+    } finally {
+      closeInProgressRef.current = false;
+      setClosingNote(false);
     }
   }, [queueSave]);
 
   useEffect(() => {
     if (!isTauriRuntime()) return;
     const closeListener = getCurrentWindow().onCloseRequested((event) => {
-      if (allowCloseRef.current) return;
       event.preventDefault();
+      logClose("native close request intercepted", {
+        noteId: noteRef.current?.id ?? null,
+        windowLabel: getCurrentWindow().label
+      });
       void closeCurrentNote();
     });
     return () => {

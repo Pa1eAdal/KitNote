@@ -247,9 +247,16 @@ fn save_note(
     note: Note,
     expected_updated_at: Option<String>,
 ) -> Result<AppData, String> {
-    with_data_access(&app, &state, |path| {
+    let note_id = note.id.clone();
+    append_log(&app, format!("Save started note_id={note_id}"));
+    let result = with_data_access(&app, &state, |path| {
         persistence::save_note(path, note, expected_updated_at.as_deref())
-    })
+    });
+    match &result {
+        Ok(_) => append_log(&app, format!("Save succeeded note_id={note_id}")),
+        Err(error) => append_log(&app, format!("Save failed note_id={note_id} error={error}")),
+    }
+    result
 }
 
 #[tauri::command]

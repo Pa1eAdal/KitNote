@@ -12,7 +12,8 @@
     "build": "tsc --noEmit && vite build",
     "tauri:build": "tauri build",
     "check": "tsc --noEmit",
-    "check:live-preview": "node scripts/check-live-preview-ranges.mjs"
+    "check:live-preview": "node scripts/check-live-preview-ranges.mjs",
+    "check:save-queue": "node scripts/check-save-queue.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

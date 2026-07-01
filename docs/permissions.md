@@ -6,7 +6,8 @@ Enabled permissions:
 
 - `core:default`: currently supplies window geometry, monitor, and event APIs. It also includes unused core menu, tray, image, path, and other APIs and should be narrowed in a later permission-focused pass.
 - `core:webview:allow-create-webview-window`: lets the `+` action and startup restoration create note windows.
-- `core:window:allow-close`: lets X close the current note after its pending save completes.
+- `core:window:allow-close`: lets native Windows close requests enter KitNote's save-before-close handler.
+- `core:window:allow-destroy`: lets the shared X/native close path destroy only the current window after its save succeeds. Tauri's close-request API also requires this permission to complete an allowed close.
 - `core:window:allow-start-dragging`: supports borderless window movement.
 - `core:window:allow-start-resize-dragging`: supports edge/corner resizing.
 - `dialog:default`: supplies the image picker, but also includes unused save/message dialogs. It should later become `dialog:allow-open`.
