@@ -3,6 +3,7 @@ import { markdown } from "@codemirror/lang-markdown";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import {
   findPreviewRegions,
+  selectPreviewRegions,
   selectionTouchesRegion
 } from "../src/editor/livePreviewRanges.ts";
 
@@ -43,5 +44,42 @@ for (const sample of ["**bold**", "*italic*", "`code`", "[link](https://example.
   assert.equal(selectionTouchesRegion(cursor(region.to), region), true);
   assert.equal(selectionTouchesRegion(cursor(region.to + 1), region), false);
 }
+
+const listSource = "1.xxx$e^{x}$\n2. xxx";
+const listState = EditorState.create({ doc: listSource, extensions: [markdown()] });
+const listRegions = findPreviewRegions(listState);
+const listMath = listRegions.find((region) => region.kind === "inline-math");
+const secondItemCursor = listSource.indexOf("2. xxx") + 3;
+
+assert.ok(listMath, "inline math inside a list should keep its own region");
+assert.equal(selectionTouchesRegion(cursor(secondItemCursor), listMath), false);
+assert.deepEqual(
+  selectPreviewRegions(cursor(secondItemCursor), listRegions)
+    .filter((region) => region.kind === "inline-math")
+    .map((region) => region.kind),
+  ["inline-math"],
+  "editing the second item should leave first-item math rendered"
+);
+
+const paragraphSource = "1.xxx$e^{x}$\n2. xxx\na\nab\nabc\nabcd\n123\n1234";
+const paragraphState = EditorState.create({ doc: paragraphSource, extensions: [markdown()] });
+const paragraphRegions = findPreviewRegions(paragraphState);
+
+assert.equal(
+  paragraphRegions.some((region) => region.block && region.from < paragraphSource.length),
+  false,
+  "list-like lines and following paragraphs must remain editable source instead of a block widget"
+);
+assert.deepEqual(
+  paragraphSource.split("\n").slice(2),
+  ["a", "ab", "abc", "abcd", "123", "1234"],
+  "post-list lines must remain unchanged"
+);
+assert.ok(
+  paragraphRegions.some(
+    (region) => region.kind === "inline-math" && region.source === "$e^{x}$"
+  ),
+  "inline math should still render independently inside source-style list lines"
+);
 
 console.log("Live Preview active-range checks passed.");

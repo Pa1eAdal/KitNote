@@ -1,6 +1,7 @@
 import type { AppData, LoadAppDataResult, Note, NoteWindowState } from "../types";
 import { defaultAppData } from "../settings/defaults";
 import { invokeCommand, isTauriRuntime } from "../utils/tauri";
+import { ensureAtLeastOneVisibleNote, visibleNotes } from "./visibility";
 
 const browserStorageKey = "kitnote.dev.notes";
 const newNoteGap = 16;
@@ -23,8 +24,13 @@ export const loadAppData = async (): Promise<LoadAppDataResult> => {
     localStorage.setItem(browserStorageKey, JSON.stringify(data));
     return { data };
   }
+  const parsed = JSON.parse(stored) as AppData;
+  const data = ensureAtLeastOneVisibleNote(parsed);
+  if (data !== parsed) {
+    localStorage.setItem(browserStorageKey, JSON.stringify(data));
+  }
   return {
-    data: JSON.parse(stored) as AppData
+    data
   };
 };
 
@@ -62,7 +68,10 @@ export const createNoteWindow = async (source: Note): Promise<Note> => {
   return createNoteFromTemplate(source, source.window);
 };
 
-export const restoreSavedNoteWindows = async (data: AppData, activeNoteId: string): Promise<number> => {
+export const restoreSavedNoteWindows = async (
+  data: AppData,
+  activeNoteId: string
+): Promise<number> => {
   if (!isTauriRuntime() || !data.globalSettings.restoreAllNotesOnLaunch) return 0;
 
   const { getCurrentWindow } = await import("@tauri-apps/api/window");
@@ -70,7 +79,7 @@ export const restoreSavedNoteWindows = async (data: AppData, activeNoteId: strin
 
   let restored = 0;
   const failures: string[] = [];
-  for (const note of data.notes) {
+  for (const note of visibleNotes(data.notes)) {
     if (note.id === activeNoteId) continue;
     try {
       const created = await openNoteWindow(note, false);
@@ -168,7 +177,8 @@ export function createNoteFromTemplate(source: Note, sourceWindow: NoteWindowSta
     settings: { ...source.settings },
     window: {
       ...size,
-      ...position
+      ...position,
+      visible: true
     },
     images: [],
     links: []
@@ -230,7 +240,8 @@ async function readCurrentWindowState(fallback: NoteWindowState): Promise<NoteWi
       x: Math.round(logicalPosition.x),
       y: Math.round(logicalPosition.y),
       width: Math.round(logicalSize.width),
-      height: Math.round(logicalSize.height)
+      height: Math.round(logicalSize.height),
+      visible: fallback.visible === true
     };
   } catch (error) {
     console.warn("KitNote could not read current window geometry; using saved note window state.", error);

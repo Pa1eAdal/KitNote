@@ -22,8 +22,15 @@ pub(super) struct LoadOutcome {
 pub(super) fn load_or_initialize(path: &Path) -> Result<LoadOutcome, String> {
     match read_data(path) {
         Ok(Some(mut data)) => {
+            let mut changed = false;
             if data.notes.is_empty() {
                 data.notes = default_app_data().notes;
+                changed = true;
+            }
+            if ensure_at_least_one_visible_note(&mut data) {
+                changed = true;
+            }
+            if changed {
                 write_data(path, &data, true)?;
             }
             Ok(LoadOutcome {
@@ -96,6 +103,22 @@ pub(super) fn create_note(path: &Path, source: Note) -> Result<Note, String> {
     data.notes.push(note.clone());
     write_data(path, &data, true)?;
     Ok(note)
+}
+
+fn ensure_at_least_one_visible_note(data: &mut AppData) -> bool {
+    if data.notes.is_empty() || data.notes.iter().any(|note| note.window.visible) {
+        return false;
+    }
+
+    if let Some(note) = data
+        .notes
+        .iter_mut()
+        .max_by(|left, right| left.updated_at.cmp(&right.updated_at))
+    {
+        note.window.visible = true;
+        return true;
+    }
+    false
 }
 
 fn read_for_update(path: &Path) -> Result<AppData, String> {
@@ -382,5 +405,128 @@ mod tests {
 
         assert!(error.contains("newer saved copy"));
         assert_eq!(current.data.notes[0].content, "newer");
+    }
+
+    #[test]
+    fn legacy_notes_without_visibility_keep_one_recoverable_startup_note() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let path = temp.path().join("notes.json");
+        load_or_initialize(&path).expect("initialize");
+        let second =
+            create_note(&path, empty_note(default_note_settings())).expect("create second");
+        let mut data = load_or_initialize(&path).expect("load data").data;
+        data.notes[0].updated_at = "2026-01-01T00:00:00Z".to_string();
+        data.notes[1].updated_at = "2026-01-02T00:00:00Z".to_string();
+        let mut value = serde_json::to_value(&data).expect("encode data");
+        for note in value["notes"].as_array_mut().expect("notes array") {
+            note["window"]
+                .as_object_mut()
+                .expect("window object")
+                .remove("visible");
+        }
+        fs::write(
+            &path,
+            serde_json::to_vec_pretty(&value).expect("encode legacy data"),
+        )
+        .expect("write legacy data");
+
+        data = load_or_initialize(&path).expect("load legacy data").data;
+
+        assert_eq!(
+            data.notes.iter().filter(|note| note.window.visible).count(),
+            1
+        );
+        assert!(
+            data.notes
+                .iter()
+                .find(|note| note.id == second.id)
+                .expect("second note")
+                .window
+                .visible
+        );
+    }
+
+    #[test]
+    fn startup_reopens_most_recent_note_when_all_are_hidden() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let path = temp.path().join("notes.json");
+        let loaded = load_or_initialize(&path).expect("initialize");
+        let mut first = loaded.data.notes[0].clone();
+        let first_version = first.updated_at.clone();
+        let mut second =
+            create_note(&path, empty_note(default_note_settings())).expect("create second");
+
+        first.window.visible = false;
+        first.updated_at = "2026-01-01T00:00:00Z".to_string();
+        save_note(&path, first, Some(&first_version)).expect("hide first");
+        let second_version = second.updated_at.clone();
+        second.window.visible = false;
+        second.updated_at = "2026-01-02T00:00:00Z".to_string();
+        save_note(&path, second.clone(), Some(&second_version)).expect("hide second");
+
+        let reloaded = load_or_initialize(&path).expect("reload hidden notes");
+        let visible = reloaded
+            .data
+            .notes
+            .iter()
+            .filter(|note| note.window.visible)
+            .collect::<Vec<_>>();
+
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].id, second.id);
+    }
+
+    #[test]
+    fn startup_keeps_closed_notes_hidden_when_an_open_note_exists() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let path = temp.path().join("notes.json");
+        let loaded = load_or_initialize(&path).expect("initialize");
+        let open_note = loaded.data.notes[0].clone();
+        let mut second =
+            create_note(&path, empty_note(default_note_settings())).expect("create second");
+        let mut third =
+            create_note(&path, empty_note(default_note_settings())).expect("create third");
+
+        let second_version = second.updated_at.clone();
+        second.window.visible = false;
+        second.updated_at = "2026-01-02T00:00:00Z".to_string();
+        save_note(&path, second.clone(), Some(&second_version)).expect("hide second");
+
+        let third_version = third.updated_at.clone();
+        third.window.visible = false;
+        third.updated_at = "2026-01-03T00:00:00Z".to_string();
+        save_note(&path, third.clone(), Some(&third_version)).expect("hide third");
+
+        let reloaded = load_or_initialize(&path).expect("restart with one open note");
+        let visible = reloaded
+            .data
+            .notes
+            .iter()
+            .filter(|note| note.window.visible)
+            .collect::<Vec<_>>();
+
+        assert_eq!(reloaded.data.notes.len(), 3);
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].id, open_note.id);
+        assert!(
+            !reloaded
+                .data
+                .notes
+                .iter()
+                .find(|note| note.id == second.id)
+                .expect("second note")
+                .window
+                .visible
+        );
+        assert!(
+            !reloaded
+                .data
+                .notes
+                .iter()
+                .find(|note| note.id == third.id)
+                .expect("third note")
+                .window
+                .visible
+        );
     }
 }

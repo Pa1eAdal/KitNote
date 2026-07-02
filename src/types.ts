@@ -20,6 +20,7 @@ export interface NoteWindowState {
   y?: number;
   width: number;
   height: number;
+  visible: boolean;
 }
 
 export interface InsertedImage {

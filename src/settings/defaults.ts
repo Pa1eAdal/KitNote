@@ -22,7 +22,8 @@ export const createEmptyNote = (settings: NoteSettings = defaultNoteSettings): N
     settings: { ...settings },
     window: {
       width: DEFAULT_NOTE_WIDTH,
-      height: DEFAULT_NOTE_HEIGHT
+      height: DEFAULT_NOTE_HEIGHT,
+      visible: true
     },
     images: [],
     links: []

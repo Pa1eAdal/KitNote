@@ -11,7 +11,7 @@ KitNote stores private user data in the Tauri application data directory. On Win
 The directory contains:
 
 ```text
-notes.json        Note titles, Markdown/TeX source, settings, and window state
+notes.json        Note titles, Markdown/TeX source, settings, window state, and visibility
 notes.backup.json Last known good notes file from before the latest successful replacement
 notes.lock        Empty interprocess lock file; contains no note content
 notes.corrupt-*.json

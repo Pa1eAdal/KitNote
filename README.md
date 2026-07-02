@@ -14,11 +14,11 @@ This software was fully generated with OpenAI Codex. The development environment
 - Always-on-top enabled by default, with a setting to turn it off.
 - Hidden top and bottom toolbars that appear on hover.
 - CodeMirror 6 live preview with Markdown source kept as the single source of truth.
-- Cursor-aware rendering for headings, bold, italic, inline code, fenced code, links, lists, blockquotes, and TeX math.
+- Cursor-aware rendering for headings, bold, italic, inline code, fenced code, links, blockquotes, and TeX math. List markers stay as editable source text for stable line editing.
 - TeX math rendering through KaTeX, including inline `$E = mc^2$` and block `$$...$$` syntax.
 - Configurable note color, font color, font size, font family, opacity, and corner radius.
 - Multiple note creation from the `+` button.
-- All saved notes restore as windows on launch while `restoreAllNotesOnLaunch` is enabled.
+- Notes that were still visible at the end of the last session restore as windows while `restoreAllNotesOnLaunch` is enabled.
 - Per-note titles that can be renamed by clicking the title in the top toolbar.
 - Local JSON persistence with single-instance protection, an interprocess lock, atomic replacement, and a last-known-good backup.
 - X and native close requests flush the latest queued note state before the window closes.
@@ -135,7 +135,9 @@ KitNote also maintains:
 
 Only one KitNote process writes this directory. A second launch focuses an existing KitNote window and exits. Saves use unique temporary files, a process-wide plus operating-system lock, stale-version checks, and atomic replacement. Read failures stop saves instead of resetting data.
 
-Closing a note is not deletion. X and native Windows close requests use one path: save the latest edit/window state, then destroy only that window. When `restoreAllNotesOnLaunch` is enabled (the current default), every saved note opens again the next time KitNote starts. Several windows at startup therefore mean that several notes are still saved, including notes created during earlier tests.
+Closing a note is not deletion. X and native Windows close requests use one path: save the latest edit/window state as hidden, then destroy only that window. Hidden notes do not auto-open next time and are not exposed in the current Settings UI. If every note was hidden, KitNote reopens only the most recently updated note on the next launch so the app is not invisible.
+
+Older note files did not track visibility. On the first launch after this update, KitNote keeps the most recently updated legacy note visible and preserves the others as hidden records. A selective note manager or recovery screen is deferred to future work.
 
 Changing the default color affects new or fresh notes, but existing persisted notes keep their saved color. To reset test data, first close KitNote and back up `%APPDATA%\com.kitnote.desktop\notes.json`, then remove that file. KitNote will create a fresh yellow note the next time it starts.
 
@@ -190,7 +192,9 @@ git push -u origin main
 - Insert a safe local document/image link and `Ctrl+click` it when rendered.
 - Confirm executable/script/shortcut/control links and UNC/network paths are blocked.
 - Create a second note with the `+` button.
-- Close the second note, quit, and relaunch to confirm all saved notes restore.
+- Close the second note, quit, and relaunch to confirm only notes left visible restore.
+- Create three notes, close two, quit, and relaunch to confirm only the note left open returns.
+- Enter `1.xxx$e^{x}$`, `2. xxx`, then `a`, `ab`, `abc`, `abcd`, `123`, and `1234` on separate lines; confirm every line remains visible and Enter continues to work.
 - Launch KitNote a second time and confirm it focuses the existing app instead of starting another writer.
 
 ## Troubleshooting
@@ -207,8 +211,7 @@ git push -u origin main
 - Images render inline in Markdown preview, but full direct manipulation is still a roadmap item.
 - Live Preview supports a focused Markdown subset. Tables, task-list controls, footnotes, and nested edge cases remain raw or partially rendered.
 - Rendered links open with `Ctrl+click`; a normal click reveals their Markdown source.
-- Closing a note closes that window; a tray menu for reopening saved notes is planned.
-- Closed notes return on the next app launch while restore-all is enabled; X currently means "close for this session," not "hide permanently" or "delete." An immediate tray/list reopen action and persistent hidden state are still planned.
+- Closing a note hides that window without deleting its saved data. Hidden records are not exposed in the current UI; a selective tray or searchable note manager is planned.
 - Local file links outside the ordinary-document/image safe list are blocked instead of showing a confirmation dialog.
 - MSI generation may require extra Windows build tooling.
 - Rounded corners use a transparent, decoration-free Tauri window with the visible note inset in CSS. Native Windows shadows are disabled for transparent note windows to avoid a rectangular frame around rounded corners.

@@ -7,9 +7,15 @@ import { LivePreviewEditor, type LivePreviewEditorHandle } from "./components/Li
 import { ResizeHandles } from "./components/ResizeHandles";
 import { SettingsMenu } from "./components/SettingsMenu";
 import { TopToolbar } from "./components/TopToolbar";
-import { createEmptyNote, defaultNoteSettings } from "./settings/defaults";
+import { createEmptyNote } from "./settings/defaults";
 import { SerializedTaskQueue, withClosingState, withTimeout } from "./notes/saveQueue";
-import { createNoteWindow, loadAppData, restoreSavedNoteWindows, saveNote } from "./notes/store";
+import {
+  createNoteWindow,
+  loadAppData,
+  restoreSavedNoteWindows,
+  saveNote
+} from "./notes/store";
+import { selectStartupNote } from "./notes/visibility";
 import type { AppData, CopiedImage, Hyperlink, Note, NoteSettings } from "./types";
 import { invokeCommand, isTauriRuntime } from "./utils/tauri";
 
@@ -77,8 +83,8 @@ export default function App() {
         const requestedNoteId = noteIdFromLocation();
         console.info("KitNote initializing window", { requestedNoteId });
         const selected = requestedNoteId
-          ? data.notes.find((item) => item.id === requestedNoteId)
-          : data.notes[0] ?? createEmptyNote();
+          ? selectStartupNote(data.notes, requestedNoteId)
+          : selectStartupNote(data.notes, null) ?? createEmptyNote();
         if (!selected) {
           const message = `Note ${requestedNoteId} was not found in local data.`;
           console.error("KitNote note initialization failed", { requestedNoteId, noteCount: data.notes.length });
@@ -137,6 +143,7 @@ export default function App() {
 
     const windowLabel = getCurrentWindow().label;
     const closingNoteId = noteRef.current?.id ?? null;
+    let hiddenStatePersisted = false;
     closeInProgressRef.current = true;
     logClose("close starts", { noteId: closingNoteId, windowLabel });
     try {
@@ -150,11 +157,19 @@ export default function App() {
         if (latest) {
           setStatus("Saving before close...");
           logClose("pending autosave flush starts", { noteId: latest.id, windowLabel });
+          const hidden = {
+            ...latest,
+            window: {
+              ...latest.window,
+              visible: false
+            }
+          };
           await withTimeout(
-            queueSave(latest),
+            queueSave(hidden),
             closeSaveTimeoutMs,
             "Saving this note timed out. The note stayed open so you can retry."
           );
+          hiddenStatePersisted = true;
           logClose("pending autosave flush succeeds", { noteId: latest.id, windowLabel });
         }
 
@@ -171,6 +186,27 @@ export default function App() {
         windowLabel,
         error
       });
+      if (hiddenStatePersisted && noteRef.current) {
+        try {
+          await withTimeout(
+            queueSave({
+              ...noteRef.current,
+              window: {
+                ...noteRef.current.window,
+                visible: true
+              }
+            }),
+            closeSaveTimeoutMs,
+            "Restoring this note's visible state timed out."
+          );
+        } catch (restoreError) {
+          console.error("[KitNote close] visible-state rollback fails", {
+            noteId: closingNoteId,
+            windowLabel,
+            error: restoreError
+          });
+        }
+      }
       setStatus(
         error instanceof Error
           ? `Note stayed open: ${error.message}`
@@ -421,7 +457,11 @@ export default function App() {
         onTitleChange={(title) => setNote((current) => (current ? { ...current, title } : current))}
       />
       {menuOpen ? (
-        <SettingsMenu settings={note.settings} appVersion={appVersion} onSettingsChange={updateSettings} />
+        <SettingsMenu
+          settings={note.settings}
+          appVersion={appVersion}
+          onSettingsChange={updateSettings}
+        />
       ) : null}
       <section className="editor-frame">
         <LivePreviewEditor

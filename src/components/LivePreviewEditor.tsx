@@ -14,10 +14,14 @@ import {
 } from "@codemirror/view";
 import {
   findPreviewRegions,
+  selectPreviewRegions,
   type PreviewRegion,
-  selectionTouchesRegion
 } from "../editor/livePreviewRanges";
-import { renderMarkdown, renderMarkdownInline, renderMathPreview } from "../editor/markdown";
+import {
+  renderMarkdown,
+  renderMarkdownInline,
+  renderMathPreview
+} from "../editor/markdown";
 
 interface LivePreviewEditorProps {
   value: string;
@@ -101,8 +105,7 @@ function buildDecorations(
   openLink: (target: string) => void
 ): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
-  for (const region of findPreviewRegions(state)) {
-    if (selectionTouchesRegion(state.selection, region)) continue;
+  for (const region of selectPreviewRegions(state.selection, findPreviewRegions(state))) {
     builder.add(
       region.from,
       region.to,

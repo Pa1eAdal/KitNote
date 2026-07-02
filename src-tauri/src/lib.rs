@@ -42,6 +42,8 @@ struct NoteWindowState {
     y: Option<i32>,
     width: f64,
     height: f64,
+    #[serde(default)]
+    visible: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -141,6 +143,7 @@ fn empty_note(settings: NoteSettings) -> Note {
             y: None,
             width: 360.0,
             height: 420.0,
+            visible: true,
         },
         images: Vec::new(),
         links: Vec::new(),
@@ -150,6 +153,7 @@ fn empty_note(settings: NoteSettings) -> Note {
 fn note_from_template(source: Note) -> Note {
     let mut note = empty_note(source.settings);
     note.window = source.window;
+    note.window.visible = true;
     note
 }
 

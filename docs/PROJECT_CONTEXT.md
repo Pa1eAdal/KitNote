@@ -69,7 +69,9 @@ The main window loads the same React application as secondary `note-*` windows. 
 
 New note labels use UUID-based IDs. New notes inherit visual and window settings from the source note but do not inherit title, content, images, or links. Placement prefers a position beside the source window and clamps the result to the monitor work area.
 
-When `restoreAllNotesOnLaunch` is enabled, all saved notes reopen as windows on startup. X closes a window for the current session; it does not delete or permanently hide the saved note. A tray/list UI and persistent hidden state do not exist yet.
+When `restoreAllNotesOnLaunch` is enabled, notes whose `window.visible` flag is true reopen as windows on startup. X saves the note with `visible: false` before destroying its window; it does not delete note data. Hidden historical notes are not exposed in Settings and do not reopen automatically. If all notes are hidden, startup makes only the most recently updated note visible so KitNote cannot launch without a window.
+
+Legacy note files have no visibility field. Their first load keeps only the most recently updated note visible and preserves all other notes as hidden, recoverable data.
 
 X and native close requests share one save-then-destroy path. Pending state is serialized and flushed before the current window is destroyed. Failures and timeouts keep the window open, restore the close button, and report an error.
 
@@ -114,7 +116,7 @@ Do not weaken this policy or automatically open local paths without explicit use
 - Corrected inline-math active range.
 - Outside-click settings dismissal.
 - Local JSON persistence, backups, corrupt-data preservation, and stale-write rejection.
-- Startup restoration of saved notes.
+- Startup restoration of only notes left visible, with a one-note fallback when all notes were closed.
 - Single-instance protection.
 - Hardened local-link handling.
 - MIT license metadata.
@@ -132,6 +134,8 @@ Some GUI behavior was not automatable during the 2026-07-01 audit because Window
 - Corrected inline-math active-range handling.
 - Remediated audit Findings 1-5: local-link safety, single-instance/interprocess protection, read-failure preservation, saved-note restoration, stale-write handling, and save-before-close.
 - Fixed the close regression where X stayed disabled because close completion required `window.destroy()` permission and the old save queue could remain unresolved.
+- Added persistent visible/hidden note state and a legacy one-note migration so closed notes no longer accumulate at startup.
+- Kept list markers as source text to prevent block widgets from swallowing following lines, while preserving independent inline-math rendering inside list-like text.
 
 ## Common Commands
 
@@ -139,6 +143,7 @@ Some GUI behavior was not automatable during the 2026-07-01 audit because Window
 npm.cmd install
 npm.cmd run check
 npm.cmd run check:live-preview
+npm.cmd run check:note-visibility
 npm.cmd run check:save-queue
 npm.cmd run build
 npm.cmd run tauri:dev
@@ -180,8 +185,8 @@ Current signing, CI provenance, and reproducible icon generation are incomplete.
 
 ## Known Limitations
 
-- X closes only for the current session; saved notes reopen while restore-all is enabled.
-- There is no note switcher, tray restore menu, permanent hide state, or delete workflow.
+- X hides notes without deleting them; hidden historical records are not exposed in the current UI.
+- There is no searchable note switcher, selective hidden-note picker, tray restore menu, or delete workflow.
 - Live Preview supports a focused Markdown subset.
 - Final Markdown/KaTeX HTML lacks a dedicated sanitizer.
 - Local copied-image rendering needs a narrowly scoped asset-protocol review.

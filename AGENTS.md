@@ -40,6 +40,7 @@
 ```powershell
 npm.cmd run check
 npm.cmd run check:live-preview
+npm.cmd run check:note-visibility
 npm.cmd run check:save-queue
 npm.cmd run build
 npm.cmd run tauri:dev

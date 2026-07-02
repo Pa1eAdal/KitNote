@@ -56,7 +56,7 @@ Post-remediation open finding totals:
 - **Finding 1 fixed:** local files now use an ordinary-document/image allowlist; shortcuts, executable/script/control types, UNC/network/device paths, remote file URLs, alternate data streams, relative paths, and unknown extensions are blocked. Validated targets use native `ShellExecuteW`, not a command string.
 - **Finding 2 fixed:** the official Tauri single-instance plugin focuses an existing window and exits a second process. Every note-data operation also takes an OS-level file lock, and writes use UUID-named temporary files.
 - **Finding 3 fixed:** save/create return ordinary read errors without writing. Startup preserves malformed JSON under a unique corrupt filename; update operations preserve a recovery copy and refuse replacement. Successful saves maintain `notes.backup.json`.
-- **Finding 4 fixed for the requested scope:** the main window honors `restoreAllNotesOnLaunch` and restores every saved secondary note window at startup. Close does not delete notes.
+- **Finding 4 fixed:** the main window honors `restoreAllNotesOnLaunch` for notes left visible. X persists hidden state without deleting content, hidden historical records do not reopen automatically, and all-hidden startup reopens only the most recently updated note.
 - **Finding 5 fixed:** frontend saves are serialized, stale note versions are rejected, and X/native close requests flush the latest note state before closing.
 - **Finding 5 regression fix:** the save queue now returns the real queued operation instead of a separately settled promise. Save and close waits are bounded, close state always resets in `finally`, and frontend/Rust diagnostics record note IDs and window labels without note content.
 - **Native close regression fix:** Tauri's `onCloseRequested` implementation completes an allowed close with `window.destroy()`. KitNote now grants the narrow `core:window:allow-destroy` permission and routes both X and native close through one save-then-destroy path without recursive close interception.
@@ -103,7 +103,7 @@ Post-remediation open finding totals:
 ### Finding 4: Closed secondary notes have no supported reopen path
 
 - **Severity:** High
-- **Remediation status:** Fixed for startup restoration on 2026-07-01
+- **Remediation status:** Fixed for visibility-aware startup restoration and recovery on 2026-07-02
 - **Area:** Multi-window lifecycle, data availability
 - **Files inspected:** `src/App.tsx:31-50`, `src/components/TopToolbar.tsx:60-70`, `src-tauri/src/lib.rs:145-153`, `src-tauri/src/lib.rs:407-424`, `src/types.ts:3-6`
 - **Problem:** Startup selects only `data.notes[0]`. The `restoreAllNotesOnLaunch` setting is stored but never acted on. Closing a note simply closes its window. There is no note list, tray restore action, or startup loop that opens saved secondary notes.
@@ -264,7 +264,7 @@ Tauri recommends async commands for heavy work because [synchronous commands exe
 - **Remediation status:** Partially fixed on 2026-07-01; documentation and High-finding regression coverage were updated
 - **Area:** Tests, documentation, maintainability
 - **Files inspected:** `docs/permissions.md`, `README.md`, `scripts/check-live-preview-ranges.mjs`, `src-tauri/src/lib.rs:427-495`
-- **Problem:** Permission/link documentation now reflects current behavior, and Rust tests cover link policy, persistence replacement/recovery, read failures, backups, stale writes, and note inheritance. Automated coverage is still missing for close-time frontend save coordination, note positioning, HTML sanitization, failed-window rollback, and restore-all window creation.
+- **Problem:** Permission/link documentation now reflects current behavior, and tests cover link policy, persistence replacement/recovery, read failures, backups, stale writes, note inheritance, save-queue recovery, and visibility-aware startup selection/migration. Automated coverage is still missing for full close-window integration, note positioning, HTML sanitization, failed-window rollback, and actual multi-window restoration.
 - **Why it matters:** Incorrect documentation hides permission drift, and high-risk paths can regress without a failing check.
 - **Recommended fix:** Update permission/link documentation after the fixes. Add focused unit/integration tests for each High finding and the persistence/window lifecycle before expanding features.
 - **Suggested priority:** Alongside each corresponding fix
@@ -308,7 +308,7 @@ No automatic network transmission of note contents was found. Remote Markdown im
 1. Replaced local-link blacklist behavior with a strict Windows-safe allowlist that blocks shortcuts, control files, and UNC/network paths.
 2. Enforced single-instance operation and protected `notes.json` with an interprocess file lock.
 3. Removed default-data fallback from save/create read failures and added last-known-good/corrupt recovery copies.
-4. Added startup restoration for every saved note while `restoreAllNotesOnLaunch` is enabled.
+4. Added visibility-aware startup restoration, non-destructive close/hide semantics, and an all-hidden one-note fallback.
 5. Added serialized saves, stale-version checks, and save flushing before a note window closes.
 6. Replaced broad Tauri default capabilities with the explicit commands required by current note-window behavior.
 
@@ -354,11 +354,12 @@ No automatic network transmission of note contents was found. Remote Markdown im
 | `git ... check-ignore -v ...` | Confirmed target, dist, node_modules, temp, logs, notes, and SQLite patterns are ignored |
 | `npm.cmd run check` | Passed |
 | `npm.cmd run check:live-preview` | Passed |
+| `npm.cmd run check:note-visibility` | Passed; visible-only restore, three-note close/restart behavior, all-hidden fallback, and explicit note-ID selection are covered |
 | `npm.cmd run check:save-queue` | Passed; serialized tasks recover after rejection, failed close state resets, and unresolved operations time out |
 | `npm.cmd run build` | Passed before and after remediation; Vite warned about a 1,111.59 kB JavaScript chunk and ineffective dynamic code splitting |
 | `cargo fmt --manifest-path src-tauri\Cargo.toml -- --check` | Passed |
 | `cargo check --manifest-path src-tauri\Cargo.toml` | Passed |
-| `cargo test --manifest-path src-tauri\Cargo.toml` | Passed after remediation; 16 tests passed, 0 failed |
+| `cargo test --manifest-path src-tauri\Cargo.toml` | Passed after visibility remediation; 19 tests passed, 0 failed |
 | `npm.cmd audit --json` | Passed after network permission was granted; 0 known vulnerabilities across 166 dependencies |
 | `cargo audit` availability check | Not available; no RustSec result was produced |
 | `npm.cmd ls --depth=0` | Passed; direct installed dependency versions recorded |
@@ -371,6 +372,7 @@ No automatic network transmission of note contents was found. Remote Markdown im
 | `npm.cmd run tauri -- info` | Environment portion succeeded, but the command did not terminate within 120 seconds and was stopped |
 | Isolated `tauri dev` using identifier `com.kitnote.codex-runtime` | Launched successfully with no Rust/Tauri terminal error |
 | Isolated `tauri dev` after capability narrowing | Normal KitNote controls and saved status loaded; repeated autosaves succeeded with no terminal permission error |
+| Synthetic three-note legacy visibility migration and restart | Passed; only the most recently updated note opened, two notes remained saved as hidden, and the second launch still opened one window |
 | Isolated runtime save diagnostics | Logged matching `Save started` and `Save succeeded` records without note content |
 | Second isolated `KitNote.exe` launch | Passed; second process exited and the running process count remained one |
 
@@ -384,7 +386,7 @@ cargo audit --file src-tauri\Cargo.lock
 ## Things Not Verified
 
 - The GUI was launched during remediation under a separate `com.kitnote.codex-runtime` data directory.
-- Automated capture of the transparent borderless window failed with Windows error `0x80004002`, so move, resize, X, `+`, restore-all window count, image insertion, always-on-top toggling, and Live Preview interaction still require manual verification.
+- Automated capture of the transparent borderless window failed with Windows error `0x80004002`, so move, resize, X, `+`, image insertion, and always-on-top toggling still require manual desktop verification. Visible-only startup count was verified with synthetic data, and Live Preview behavior was verified in the browser frontend.
 - Single-instance process behavior was verified without GUI input.
 - No malicious `.lnk`, UNC, executable, or other local target was opened.
 - No power-loss, disk-full, antivirus-lock, roaming-profile, Unicode-path, OneDrive-path, or simultaneous-process fault injection was performed.

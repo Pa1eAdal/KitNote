@@ -348,6 +348,7 @@ select {
 .live-preview-widget {
   color: var(--note-fg);
   cursor: text;
+  white-space: normal;
 }
 
 .live-preview-widget > :first-child {
@@ -385,12 +386,6 @@ select {
   margin: 0.35em 0;
   padding-left: 0.75em;
   border-left: 3px solid rgba(35, 31, 26, 0.25);
-}
-
-.live-preview-list ul,
-.live-preview-list ol {
-  margin: 0.35em 0;
-  padding-left: 1.4em;
 }
 
 .live-preview-block-math {
