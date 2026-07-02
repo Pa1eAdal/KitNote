@@ -1,15 +1,22 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "KitNote default desktop capability. Grants core window APIs and the file dialog picker only; note file access stays in Rust commands.",
+  "description": "Least-privilege desktop capability for KitNote main and note windows. Note data and validated link opening stay in Rust commands.",
   "windows": ["main", "note-*"],
   "permissions": [
-    "core:default",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
     "core:webview:allow-create-webview-window",
-    "core:window:allow-close",
+    "core:window:allow-current-monitor",
     "core:window:allow-destroy",
+    "core:window:allow-get-all-windows",
+    "core:window:allow-outer-position",
+    "core:window:allow-outer-size",
+    "core:window:allow-scale-factor",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-focus",
     "core:window:allow-start-dragging",
     "core:window:allow-start-resize-dragging",
-    "dialog:default"
+    "dialog:allow-open"
   ]
 }

@@ -6,9 +6,9 @@ Source of truth: `docs/SECURITY_AUDIT.md`. This file is a planning summary, not 
 
 ## Current Position
 
-The 2026-07-01 remediation closed all four High findings and Medium Finding 5. The audit records zero open Critical or High findings, seven open Medium findings, four open Low findings, and two informational findings.
+The 2026-07-01 remediation closed all four High findings, Medium Finding 5, and Medium Finding 6. The audit records zero open Critical or High findings, six open Medium findings, four open Low findings, and two informational findings.
 
-This does not mean KitNote is fully hardened. Important renderer, capability, persistence, responsiveness, image, and release controls remain incomplete.
+This does not mean KitNote is fully hardened. Important renderer, persistence, responsiveness, image, and release controls remain incomplete.
 
 ## Completed Security And Reliability Work
 
@@ -34,18 +34,18 @@ This does not mean KitNote is fully hardened. Important renderer, capability, pe
 - Fixed the regression where X stayed disabled by returning the real queue operation, bounding waits, resetting close state in `finally`, and granting the narrow destroy permission.
 - Close diagnostics use note IDs/window labels and do not intentionally log note content.
 
+### Tauri Capabilities
+
+Audit Finding 6, fixed on 2026-07-01.
+
+- Removed `core:default` and replaced it with the exact event and window commands used by KitNote.
+- Narrowed `dialog:default` to `dialog:allow-open`.
+- Added the required runtime always-on-top setter.
+- Removed the unused Tauri close command permission; save-before-close uses explicit window destruction.
+- Kept frontend webview-window creation because both main and secondary notes provide `+`; moving creation to Rust remains a possible future architectural reduction.
+- No filesystem, shell, or opener plugin permission is granted.
+
 ## Priority 1: Next Focused Hardening Batch
-
-### Narrow Tauri Capabilities
-
-Audit Finding 6, Medium.
-
-- Replace broad `core:default` with the exact app, event, monitor, and window permissions in use.
-- Replace `dialog:default` with `dialog:allow-open`.
-- Add only the runtime always-on-top setter permission that KitNote needs.
-- Preserve create-window, close/destroy, drag, resize, geometry, event, and monitor behavior.
-- Consider Rust-owned note-window creation later, but do not combine that redesign with the first permission-only change.
-- Add a permission regression checklist for move, resize, X, `+`, restoration, image picker, and always-on-top.
 
 ### Harden Rendered Markdown And Math
 
@@ -134,10 +134,9 @@ No CI release workflow is currently present in the repository.
 
 Keep the next implementation focused:
 
-1. Narrow Tauri permissions without redesigning window creation.
-2. Add final Markdown/KaTeX sanitization and adversarial rendering tests.
-3. Harden CSP alongside the sanitizer and verify the release-build policy.
-4. Audit diagnostics to ensure note content and local paths never enter logs.
+1. Add final Markdown/KaTeX sanitization and adversarial rendering tests.
+2. Harden CSP alongside the sanitizer and verify the release-build policy.
+3. Audit diagnostics to ensure note content and local paths never enter logs.
 
 Preserve move, resize, X, `+`, restoration, always-on-top, Live Preview, settings dismissal, link blocking, single-instance protection, and persistence recovery.
 
@@ -165,5 +164,5 @@ For each security batch:
 ## Suggested Next Prompt
 
 ```text
-Fix only Tauri capability narrowing from Finding 6 in docs/SECURITY_AUDIT.md. Replace broad defaults with the minimum permissions KitNote actually uses, including only the required runtime always-on-top setter. Preserve app launch, move, resize, X save-before-close, + note creation, restore-all startup, image picker, Live Preview, single-instance behavior, and persistence protections. Do not change the UI, note model, local-link policy, installer configuration, or merge to main. Add focused permission documentation and run npm check/build, queue and Live Preview checks, Rust fmt/check/test, and manual Tauri window verification.
+Fix only rendered Markdown and KaTeX hardening from Finding 8 in docs/SECURITY_AUDIT.md. Add a maintained final allowlist sanitizer or eliminate unsafe HTML-string construction, and escape fatal math fallbacks. Preserve Live Preview behavior, source editing, links, TeX rendering, all window behavior, local-link policy, single-instance behavior, and persistence protections. Do not redesign the UI, change the note model, alter Tauri permissions, modify installer configuration, or merge to main. Add adversarial rendering tests and run npm check/build, queue and Live Preview checks, Rust fmt/check/test, and manual Tauri verification.
 ```

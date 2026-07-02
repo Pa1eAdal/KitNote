@@ -47,7 +47,7 @@ The borderless transparent window uses custom drag and resize controls. Tauri wi
 
 `src-tauri/src/lib.rs` registers Tauri commands and plugins. Rust owns note persistence, image copying, validated link launching, logging, and single-instance handling. Persistence details are separated into `src-tauri/src/persistence.rs`; Windows local-link validation is in `src-tauri/src/link_policy.rs`.
 
-Frontend access is controlled by `src-tauri/capabilities/default.json`. The current capability works but is broader than least privilege; see `docs/permissions.md` and `docs/SECURITY_BACKLOG.md`.
+Frontend access is controlled by `src-tauri/capabilities/default.json`. Broad core and dialog defaults were replaced with the specific event, window, webview-window creation, and open-dialog commands KitNote uses. See `docs/permissions.md` and `docs/SECURITY_BACKLOG.md`.
 
 ### Note Persistence
 
@@ -85,7 +85,7 @@ Markdown rendering disables raw HTML and KaTeX uses `trust: false`, but final re
 
 Per-note settings include colors, font, opacity, corner radius, and always-on-top behavior. Titles are editable from the top toolbar. The settings popover closes on outside click or Escape.
 
-The startup window is always-on-top through Tauri configuration. Runtime changes need explicit permission coverage when capabilities are narrowed; consult `docs/permissions.md`.
+The startup window is always-on-top through Tauri configuration. Runtime setting changes use the explicit `core:window:allow-set-always-on-top` permission; consult `docs/permissions.md`.
 
 ### Local Link Policy
 

@@ -19,7 +19,7 @@ No Critical issue was found. The original audit identified four High issues:
 3. A transient read failure can cause a later save/create operation to continue from fresh default data.
 4. secondary notes become unavailable through the UI after their window is closed or after restart.
 
-The focused remediation pass on 2026-07-01 fixed all four High findings and Medium Finding 5. Important Medium issues remain around main-thread Rust I/O, permissions, local image rendering, HTML rendering boundaries, persistence migrations, failed window creation, and unsigned release packaging.
+The focused remediation passes on 2026-07-01 fixed all four High findings and Medium Findings 5 and 6. Important Medium issues remain around main-thread Rust I/O, local image rendering, HTML rendering boundaries, persistence migrations, failed window creation, and unsigned release packaging.
 
 The first-pass audit changed only this report. The later focused remediation changed the application and documentation files described in the remediation status and command results below.
 
@@ -47,7 +47,7 @@ Post-remediation open finding totals:
 | --- | ---: |
 | Critical | 0 |
 | High | 0 |
-| Medium | 7 |
+| Medium | 6 |
 | Low | 4 |
 | Info | 2 |
 
@@ -60,6 +60,7 @@ Post-remediation open finding totals:
 - **Finding 5 fixed:** frontend saves are serialized, stale note versions are rejected, and X/native close requests flush the latest note state before closing.
 - **Finding 5 regression fix:** the save queue now returns the real queued operation instead of a separately settled promise. Save and close waits are bounded, close state always resets in `finally`, and frontend/Rust diagnostics record note IDs and window labels without note content.
 - **Native close regression fix:** Tauri's `onCloseRequested` implementation completes an allowed close with `window.destroy()`. KitNote now grants the narrow `core:window:allow-destroy` permission and routes both X and native close through one save-then-destroy path without recursive close interception.
+- **Finding 6 fixed:** `core:default` was replaced with the exact event/window commands KitNote uses, `dialog:default` was narrowed to `dialog:allow-open`, the runtime always-on-top setter was added, and the unused Tauri close command grant was removed.
 
 ## Findings
 
@@ -126,6 +127,7 @@ Post-remediation open finding totals:
 ### Finding 6: The Tauri capability is both broader than needed and incomplete
 
 - **Severity:** Medium
+- **Remediation status:** Fixed on 2026-07-01
 - **Area:** Tauri permissions, least privilege
 - **Files inspected:** `src-tauri/capabilities/default.json`, generated `src-tauri/gen/schemas/acl-manifests.json`, `src/App.tsx`, `src/notes/store.ts`, `src/components/TopToolbar.tsx`, `src/components/ResizeHandles.tsx`
 - **Problem:** `core:default` expands to defaults for app, event, image, menu, path, resources, tray, webview, and window. It grants unused menu/tray/image/path operations. `dialog:default` grants message, save, and open dialogs even though KitNote uses only open. Conversely, `setAlwaysOnTop()` is called but `core:window:allow-set-always-on-top` is not granted, so changing that setting can fail at runtime.
@@ -134,7 +136,7 @@ Post-remediation open finding totals:
 - **Suggested priority:** After High findings
 - **Whether code change is required:** Yes
 
-Enabled permission review:
+Pre-remediation permission review:
 
 | Permission | Current reason | Needed? | Narrowing |
 | --- | --- | --- | --- |
@@ -147,6 +149,8 @@ Enabled permission review:
 | Missing: `core:window:allow-set-always-on-top` | Settings toggle | Yes | Add only this setter |
 
 Tauri's documentation confirms that [`core:default` expands to all core defaults](https://v2.tauri.app/reference/acl/core-permissions/) and [`dialog:default` enables open, save, and message](https://v2.tauri.app/plugin/dialog/).
+
+The focused remediation replaced the defaults with explicit event listen/unlisten; current-monitor, geometry, scale, focus, always-on-top, destroy, drag, and resize window commands; webview-window creation; and open-dialog access. The unused close command was removed because KitNote's intercepted close flow calls `destroy()` only after a successful save. No Tauri filesystem, shell, or opener permission is enabled.
 
 ### Finding 7: Copied local images are not exposed by a scoped asset protocol
 
@@ -306,10 +310,10 @@ No automatic network transmission of note contents was found. Remote Markdown im
 3. Removed default-data fallback from save/create read failures and added last-known-good/corrupt recovery copies.
 4. Added startup restoration for every saved note while `restoreAllNotesOnLaunch` is enabled.
 5. Added serialized saves, stale-version checks, and save flushing before a note window closes.
+6. Replaced broad Tauri default capabilities with the explicit commands required by current note-window behavior.
 
 ## Safe Later Improvements
 
-- Narrow Tauri capabilities and add only the missing always-on-top setter.
 - Enable a tightly scoped asset protocol for copied images.
 - Sanitize final Live Preview HTML and escape every fatal fallback.
 - Move blocking commands off the main thread and reduce whole-file rewrites.
@@ -362,9 +366,11 @@ No automatic network transmission of note contents was found. Remote Markdown im
 | `cargo tree ... --duplicates` | Passed; expected transitive duplicates found, including Windows support crates and two `thiserror` major versions |
 | Adversarial Markdown/KaTeX Node spot checks | Raw HTML escaped; common script links not rendered as anchors; KaTeX untrusted JavaScript href not activated |
 | Generated Tauri ACL manifest inspection | Confirmed `core:default` and `dialog:default` expansions |
+| Post-Finding 6 source/API-to-ACL mapping | Confirmed every retained permission maps to a current frontend Tauri call; broad core/dialog defaults and the unused close command are absent |
 | Directory size measurement | `src-tauri/target` measured at 3.719 GiB after Rust checks |
 | `npm.cmd run tauri -- info` | Environment portion succeeded, but the command did not terminate within 120 seconds and was stopped |
 | Isolated `tauri dev` using identifier `com.kitnote.codex-runtime` | Launched successfully with no Rust/Tauri terminal error |
+| Isolated `tauri dev` after capability narrowing | Normal KitNote controls and saved status loaded; repeated autosaves succeeded with no terminal permission error |
 | Isolated runtime save diagnostics | Logged matching `Save started` and `Save succeeded` records without note content |
 | Second isolated `KitNote.exe` launch | Passed; second process exited and the running process count remained one |
 
@@ -391,5 +397,5 @@ cargo audit --file src-tauri\Cargo.lock
 ## Recommended Next Codex Prompt
 
 ```text
-Fix only remaining Medium findings 6-12 in docs/SECURITY_AUDIT.md, one focused group at a time. Start with Tauri permission narrowing and the scoped local-image asset protocol. Do not redesign the UI or change the note data model. Preserve move, resize, X, +, transparency, rounded corners, always-on-top, Live Preview, note inheritance, restore-all startup, single-instance protection, and save-before-close. Run npm check/build, Rust fmt/check/test, and focused regression tests.
+Fix only Finding 8 in docs/SECURITY_AUDIT.md: add final Markdown/KaTeX output sanitization and adversarial rendering tests. Do not redesign the UI or change the note data model. Preserve move, resize, X, +, transparency, rounded corners, always-on-top, Live Preview behavior, note inheritance, restore-all startup, local-link policy, single-instance protection, and save-before-close. Run npm check/build, focused Live Preview checks, Rust fmt/check/test, and manual regression verification.
 ```
