@@ -28,7 +28,7 @@ This does not mean KitNote is fully hardened. Important renderer, persistence, r
 
 ### Window Lifecycle
 
-- Restores only notes left visible while `restoreAllNotesOnLaunch` is enabled; X hides without deleting, and all-hidden startup reopens only the most recently updated note.
+- Restores only notes left visible while `restoreAllNotesOnLaunch` is enabled; X hides without deleting, and all-hidden startup reopens only the most recently updated non-empty note when one exists.
 - Serializes frontend saves and flushes the latest note state before X/native close.
 - Uses one save-then-destroy path for custom and native close.
 - Fixed the regression where X stayed disabled by returning the real queue operation, bounding waits, resetting close state in `finally`, and granting the narrow destroy permission.

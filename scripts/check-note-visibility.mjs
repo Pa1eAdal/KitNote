@@ -44,11 +44,33 @@ const alreadyVisible = {
   ...hiddenData,
   notes: [
     note("open", "2026-01-01T00:00:00Z", true),
+    note("newer-open", "2026-01-03T00:00:00Z", true),
     note("hidden", "2026-01-02T00:00:00Z", false)
   ]
 };
 assert.equal(ensureAtLeastOneVisibleNote(alreadyVisible), alreadyVisible);
-assert.deepEqual(visibleNotes(alreadyVisible.notes).map(({ id }) => id), ["open"]);
+assert.deepEqual(visibleNotes(alreadyVisible.notes).map(({ id }) => id), ["open", "newer-open"]);
+assert.equal(
+  selectStartupNote(alreadyVisible.notes, null)?.id,
+  "newer-open",
+  "the main window should use the most recently updated visible note"
+);
+
+const olderNonEmpty = note("older-non-empty", "2026-01-01T00:00:00Z", false);
+olderNonEmpty.content = "saved content";
+const allHiddenWithNewerBlank = {
+  ...hiddenData,
+  notes: [
+    olderNonEmpty,
+    note("newer-blank", "2026-01-02T00:00:00Z", false)
+  ]
+};
+const nonEmptyFallback = ensureAtLeastOneVisibleNote(allHiddenWithNewerBlank);
+assert.deepEqual(
+  visibleNotes(nonEmptyFallback.notes).map(({ id }) => id),
+  ["older-non-empty"],
+  "an all-hidden startup should prefer the most recently updated non-empty note"
+);
 
 const threeNotesAfterClosingTwo = {
   ...hiddenData,

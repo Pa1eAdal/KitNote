@@ -135,7 +135,7 @@ KitNote also maintains:
 
 Only one KitNote process writes this directory. A second launch focuses an existing KitNote window and exits. Saves use unique temporary files, a process-wide plus operating-system lock, stale-version checks, and atomic replacement. Read failures stop saves instead of resetting data.
 
-Closing a note is not deletion. X and native Windows close requests use one path: save the latest edit/window state as hidden, then destroy only that window. Hidden notes do not auto-open next time and are not exposed in the current Settings UI. If every note was hidden, KitNote reopens only the most recently updated note on the next launch so the app is not invisible.
+Closing a note is not deletion. X and native Windows close requests use one path: save the latest edit/window state as hidden, then destroy only that window. Hidden notes do not auto-open next time and are not exposed in the current Settings UI. If every note was hidden, KitNote reopens the most recently updated non-empty note, or the most recently updated note if all are blank, so the app is not invisible.
 
 Older note files did not track visibility. On the first launch after this update, KitNote keeps the most recently updated legacy note visible and preserves the others as hidden records. A selective note manager or recovery screen is deferred to future work.
 
@@ -209,7 +209,7 @@ git push -u origin main
 
 - Image drag/drop depends on whether the Windows WebView exposes a real file path. The image button is the reliable path.
 - Images render inline in Markdown preview, but full direct manipulation is still a roadmap item.
-- Live Preview supports a focused Markdown subset. Tables, task-list controls, footnotes, and nested edge cases remain raw or partially rendered.
+- Live Preview supports a focused Markdown subset. List markers remain source-style, and Enter inserts a plain newline instead of Markdown list continuation. Tables, task-list controls, footnotes, and nested edge cases remain raw or partially rendered.
 - Rendered links open with `Ctrl+click`; a normal click reveals their Markdown source.
 - Closing a note hides that window without deleting its saved data. Hidden records are not exposed in the current UI; a selective tray or searchable note manager is planned.
 - Local file links outside the ordinary-document/image safe list are blocked instead of showing a confirmation dialog.

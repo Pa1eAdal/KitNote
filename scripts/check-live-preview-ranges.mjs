@@ -1,11 +1,11 @@
 import assert from "node:assert/strict";
-import { markdown } from "@codemirror/lang-markdown";
 import { EditorSelection, EditorState } from "@codemirror/state";
 import {
   findPreviewRegions,
   selectPreviewRegions,
   selectionTouchesRegion
 } from "../src/editor/livePreviewRanges.ts";
+import { insertNoteNewline, noteMarkdown } from "../src/editor/noteMarkdown.ts";
 
 function cursor(position) {
   return { ranges: [EditorSelection.cursor(position)] };
@@ -16,7 +16,7 @@ function selection(from, to) {
 }
 
 const source = "456$e^{x}$789";
-const state = EditorState.create({ doc: source, extensions: [markdown()] });
+const state = EditorState.create({ doc: source, extensions: [noteMarkdown()] });
 const inlineMath = findPreviewRegions(state).find((region) => region.kind === "inline-math");
 
 assert.ok(inlineMath, "inline math region should be detected");
@@ -36,7 +36,7 @@ assert.equal(selectionTouchesRegion(selection(2, 4), inlineMath), true, "overlap
 assert.equal(selectionTouchesRegion(selection(10, 11), inlineMath), false, "selection after math stays rendered");
 
 for (const sample of ["**bold**", "*italic*", "`code`", "[link](https://example.com)"]) {
-  const sampleState = EditorState.create({ doc: `a${sample}b`, extensions: [markdown()] });
+  const sampleState = EditorState.create({ doc: `a${sample}b`, extensions: [noteMarkdown()] });
   const region = findPreviewRegions(sampleState)[0];
   assert.ok(region, `${sample} region should be detected`);
   assert.equal(selectionTouchesRegion(cursor(region.from - 1), region), false);
@@ -46,7 +46,7 @@ for (const sample of ["**bold**", "*italic*", "`code`", "[link](https://example.
 }
 
 const listSource = "1.xxx$e^{x}$\n2. xxx";
-const listState = EditorState.create({ doc: listSource, extensions: [markdown()] });
+const listState = EditorState.create({ doc: listSource, extensions: [noteMarkdown()] });
 const listRegions = findPreviewRegions(listState);
 const listMath = listRegions.find((region) => region.kind === "inline-math");
 const secondItemCursor = listSource.indexOf("2. xxx") + 3;
@@ -62,7 +62,7 @@ assert.deepEqual(
 );
 
 const paragraphSource = "1.xxx$e^{x}$\n2. xxx\na\nab\nabc\nabcd\n123\n1234";
-const paragraphState = EditorState.create({ doc: paragraphSource, extensions: [markdown()] });
+const paragraphState = EditorState.create({ doc: paragraphSource, extensions: [noteMarkdown()] });
 const paragraphRegions = findPreviewRegions(paragraphState);
 
 assert.equal(
@@ -75,11 +75,41 @@ assert.deepEqual(
   ["a", "ab", "abc", "abcd", "123", "1234"],
   "post-list lines must remain unchanged"
 );
+for (let lineNumber = 3; lineNumber <= 8; lineNumber += 1) {
+  const line = paragraphState.doc.line(lineNumber);
+  assert.equal(
+    paragraphRegions.some((region) => region.from < line.to && region.to > line.from),
+    false,
+    `no preview decoration should cover post-list line ${lineNumber}`
+  );
+}
 assert.ok(
   paragraphRegions.some(
     (region) => region.kind === "inline-math" && region.source === "$e^{x}$"
   ),
   "inline math should still render independently inside source-style list lines"
 );
+
+for (const line of ["a", "ab", "abc", "abcd", "123", "1234"]) {
+  const beforeEnter = `${listSource}\n${line}`;
+  let enterState = EditorState.create({
+    doc: beforeEnter,
+    selection: EditorSelection.cursor(beforeEnter.length),
+    extensions: [noteMarkdown()]
+  });
+  const handled = insertNoteNewline({
+    state: enterState,
+    dispatch(transaction) {
+      enterState = transaction.state;
+    }
+  });
+
+  assert.equal(handled, true, `Enter should be handled after ${line}`);
+  assert.equal(
+    enterState.doc.toString(),
+    `${beforeEnter}\n`,
+    `Enter after ${line} should add one plain newline without changing or indenting source`
+  );
+}
 
 console.log("Live Preview active-range checks passed.");

@@ -110,11 +110,22 @@ fn ensure_at_least_one_visible_note(data: &mut AppData) -> bool {
         return false;
     }
 
-    if let Some(note) = data
+    let fallback_id = data
         .notes
-        .iter_mut()
+        .iter()
+        .filter(|note| !note.content.trim().is_empty())
         .max_by(|left, right| left.updated_at.cmp(&right.updated_at))
-    {
+        .or_else(|| {
+            data.notes
+                .iter()
+                .max_by(|left, right| left.updated_at.cmp(&right.updated_at))
+        })
+        .map(|note| note.id.clone());
+
+    let Some(fallback_id) = fallback_id else {
+        return false;
+    };
+    if let Some(note) = data.notes.iter_mut().find(|note| note.id == fallback_id) {
         note.window.visible = true;
         return true;
     }
@@ -474,6 +485,40 @@ mod tests {
 
         assert_eq!(visible.len(), 1);
         assert_eq!(visible[0].id, second.id);
+    }
+
+    #[test]
+    fn all_hidden_startup_prefers_non_empty_note_over_newer_blank_note() {
+        let temp = tempfile::tempdir().expect("temp dir");
+        let path = temp.path().join("notes.json");
+        let loaded = load_or_initialize(&path).expect("initialize");
+        let mut non_empty = loaded.data.notes[0].clone();
+        let non_empty_version = non_empty.updated_at.clone();
+        let mut newer_blank =
+            create_note(&path, empty_note(default_note_settings())).expect("create blank note");
+
+        non_empty.content = "saved content".to_string();
+        non_empty.window.visible = false;
+        non_empty.updated_at = "2026-01-01T00:00:00Z".to_string();
+        save_note(&path, non_empty.clone(), Some(&non_empty_version))
+            .expect("save hidden non-empty note");
+
+        let blank_version = newer_blank.updated_at.clone();
+        newer_blank.window.visible = false;
+        newer_blank.updated_at = "2026-01-02T00:00:00Z".to_string();
+        save_note(&path, newer_blank, Some(&blank_version)).expect("save hidden blank note");
+
+        let reloaded = load_or_initialize(&path).expect("restart with all notes hidden");
+        let visible = reloaded
+            .data
+            .notes
+            .iter()
+            .filter(|note| note.window.visible)
+            .collect::<Vec<_>>();
+
+        assert_eq!(visible.len(), 1);
+        assert_eq!(visible[0].id, non_empty.id);
+        assert_eq!(visible[0].content, "saved content");
     }
 
     #[test]

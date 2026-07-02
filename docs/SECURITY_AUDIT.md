@@ -56,7 +56,7 @@ Post-remediation open finding totals:
 - **Finding 1 fixed:** local files now use an ordinary-document/image allowlist; shortcuts, executable/script/control types, UNC/network/device paths, remote file URLs, alternate data streams, relative paths, and unknown extensions are blocked. Validated targets use native `ShellExecuteW`, not a command string.
 - **Finding 2 fixed:** the official Tauri single-instance plugin focuses an existing window and exits a second process. Every note-data operation also takes an OS-level file lock, and writes use UUID-named temporary files.
 - **Finding 3 fixed:** save/create return ordinary read errors without writing. Startup preserves malformed JSON under a unique corrupt filename; update operations preserve a recovery copy and refuse replacement. Successful saves maintain `notes.backup.json`.
-- **Finding 4 fixed:** the main window honors `restoreAllNotesOnLaunch` for notes left visible. X persists hidden state without deleting content, hidden historical records do not reopen automatically, and all-hidden startup reopens only the most recently updated note.
+- **Finding 4 fixed:** the main window honors `restoreAllNotesOnLaunch` for notes left visible and selects the most recently updated visible note for the main window. X persists hidden state without deleting content, hidden historical records do not reopen automatically, and all-hidden startup prefers the most recently updated non-empty note.
 - **Finding 5 fixed:** frontend saves are serialized, stale note versions are rejected, and X/native close requests flush the latest note state before closing.
 - **Finding 5 regression fix:** the save queue now returns the real queued operation instead of a separately settled promise. Save and close waits are bounded, close state always resets in `finally`, and frontend/Rust diagnostics record note IDs and window labels without note content.
 - **Native close regression fix:** Tauri's `onCloseRequested` implementation completes an allowed close with `window.destroy()`. KitNote now grants the narrow `core:window:allow-destroy` permission and routes both X and native close through one save-then-destroy path without recursive close interception.
@@ -353,13 +353,13 @@ No automatic network transmission of note contents was found. Remote Markdown im
 | `git ... ls-files` build/private artifact scan | No tracked target, dist, node_modules, installer, executable, note, log, environment, or SQLite files found |
 | `git ... check-ignore -v ...` | Confirmed target, dist, node_modules, temp, logs, notes, and SQLite patterns are ignored |
 | `npm.cmd run check` | Passed |
-| `npm.cmd run check:live-preview` | Passed |
-| `npm.cmd run check:note-visibility` | Passed; visible-only restore, three-note close/restart behavior, all-hidden fallback, and explicit note-ID selection are covered |
+| `npm.cmd run check:live-preview` | Passed; source-style list lines, plain Enter behavior, independent list-line math, and inline-math cursor boundaries are covered |
+| `npm.cmd run check:note-visibility` | Passed; visible-only restore, latest-visible main selection, three-note close/restart behavior, non-empty all-hidden fallback, and explicit note-ID selection are covered |
 | `npm.cmd run check:save-queue` | Passed; serialized tasks recover after rejection, failed close state resets, and unresolved operations time out |
 | `npm.cmd run build` | Passed before and after remediation; Vite warned about a 1,111.59 kB JavaScript chunk and ineffective dynamic code splitting |
 | `cargo fmt --manifest-path src-tauri\Cargo.toml -- --check` | Passed |
 | `cargo check --manifest-path src-tauri\Cargo.toml` | Passed |
-| `cargo test --manifest-path src-tauri\Cargo.toml` | Passed after visibility remediation; 19 tests passed, 0 failed |
+| `cargo test --manifest-path src-tauri\Cargo.toml` | Passed after startup-selection remediation; 20 tests passed, 0 failed |
 | `npm.cmd audit --json` | Passed after network permission was granted; 0 known vulnerabilities across 166 dependencies |
 | `cargo audit` availability check | Not available; no RustSec result was produced |
 | `npm.cmd ls --depth=0` | Passed; direct installed dependency versions recorded |

@@ -8,13 +8,27 @@ export function visibleNotes(notes: Note[]): Note[] {
   return notes.filter(isNoteVisible);
 }
 
+function mostRecentlyUpdated(notes: Note[]): Note | undefined {
+  return notes.reduce<Note | undefined>(
+    (latest, note) => (!latest || note.updatedAt > latest.updatedAt ? note : latest),
+    undefined
+  );
+}
+
+function preferredFallbackNote(notes: Note[]): Note | undefined {
+  return (
+    mostRecentlyUpdated(notes.filter((note) => note.content.trim().length > 0)) ??
+    mostRecentlyUpdated(notes)
+  );
+}
+
 export function ensureAtLeastOneVisibleNote(data: AppData): AppData {
   if (data.notes.length === 0 || data.notes.some(isNoteVisible)) {
     return data;
   }
-  const fallback = data.notes.reduce((latest, note) =>
-    note.updatedAt > latest.updatedAt ? note : latest
-  );
+  const fallback = preferredFallbackNote(data.notes);
+  if (!fallback) return data;
+
   return {
     ...data,
     notes: data.notes.map((note) => ({
@@ -31,5 +45,5 @@ export function selectStartupNote(notes: Note[], requestedNoteId: string | null)
   if (requestedNoteId) {
     return notes.find((note) => note.id === requestedNoteId);
   }
-  return visibleNotes(notes)[0] ?? notes[0];
+  return mostRecentlyUpdated(visibleNotes(notes)) ?? preferredFallbackNote(notes);
 }

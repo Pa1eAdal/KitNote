@@ -24,6 +24,8 @@ This is user data, not disposable cache data. Deleting `notes.json` resets saved
 
 The Rust backend resolves the directory through Tauri's `app_data_dir()` API. KitNote is currently a Windows-focused application, although the API itself is platform-aware.
 
+The committed Tauri identifier is `com.kitnote.desktop`, and Git history shows that identifier has not changed since the Tauri project was created. Normal `npm.cmd run tauri:dev` runs therefore use the directory above. Isolated QA runs may temporarily use a different identifier such as `com.kitnote.codex-runtime`; those runs have a separate app-data directory and do not load normal KitNote notes.
+
 ## Write And Recovery Behavior
 
 KitNote permits only one running app instance. Note commands also take an operating-system file lock, so a second writer cannot enter the read/modify/write section at the same time.
