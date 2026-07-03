@@ -354,7 +354,7 @@ No automatic network transmission of note contents was found. Remote Markdown im
 | `git ... ls-files` build/private artifact scan | No tracked target, dist, node_modules, installer, executable, note, log, environment, or SQLite files found |
 | `git ... check-ignore -v ...` | Confirmed target, dist, node_modules, temp, logs, notes, and SQLite patterns are ignored |
 | `npm.cmd run check` | Passed |
-| `npm.cmd run check:live-preview` | Passed; source-style list lines, plain Enter behavior, independent list-line math, and inline-math cursor boundaries are covered |
+| `npm.cmd run check:live-preview` | Passed; source-style list lines, controlled ordered/unordered continuation, empty-item exit, stable paragraph Enter behavior, independent list-line math, and inline-math cursor boundaries are covered |
 | `npm.cmd run check:note-visibility` | Passed; visible-only restore, latest-visible main selection, three-note close/restart behavior, non-empty all-hidden fallback, and explicit note-ID selection are covered |
 | `npm.cmd run check:save-queue` | Passed; serialized tasks recover after rejection, failed close state resets, and unresolved operations time out |
 | `npm.cmd run build` | Passed before and after remediation; Vite warned about a 1,111.59 kB JavaScript chunk and ineffective dynamic code splitting |

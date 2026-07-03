@@ -79,7 +79,7 @@ X and native close requests share one save-then-destroy path. Pending state is s
 
 `src/components/LivePreviewEditor.tsx` uses CodeMirror 6. Markdown and TeX rendering helpers live under `src/editor/`. The saved Markdown/TeX source remains the single source of truth.
 
-Inactive syntax is rendered while source around the cursor or selection stays visible for editing. The active-range logic includes the corrected inline-math boundary behavior. Lists stay source-style: KitNote disables CodeMirror's Markdown list-continuation keymap and inserts a plain newline on Enter so following paragraph text cannot be reindented or reclassified as a list continuation. The supported Markdown subset is intentionally limited; tables, task lists, footnotes, and complex nested cases may remain raw or partially rendered.
+Inactive syntax is rendered while source around the cursor or selection stays visible for editing. The active-range logic includes the corrected inline-math boundary behavior. Lists stay source-style: KitNote disables CodeMirror's broad Markdown list keymap and uses a narrow Enter command that continues explicit ordered or unordered markers, exits an empty marker, and otherwise inserts a plain newline. This keeps following paragraph text from being reindented or reclassified as list continuation. The supported Markdown subset is intentionally limited; tables, task lists, footnotes, and complex nested cases may remain raw or partially rendered.
 
 Markdown rendering disables raw HTML and KaTeX uses `trust: false`, but final rendered HTML still crosses an `innerHTML` boundary without a dedicated allowlist sanitizer. This remains a security backlog item.
 
@@ -135,7 +135,7 @@ Some GUI behavior was not automatable during the 2026-07-01 audit because Window
 - Remediated audit Findings 1-5: local-link safety, single-instance/interprocess protection, read-failure preservation, saved-note restoration, stale-write handling, and save-before-close.
 - Fixed the close regression where X stayed disabled because close completion required `window.destroy()` permission and the old save queue could remain unresolved.
 - Added persistent visible/hidden note state and a legacy one-note migration so closed notes no longer accumulate at startup.
-- Kept list markers as source text and disabled Markdown-aware Enter continuation to prevent following lines from being swallowed or indented, while preserving independent inline-math rendering inside list-like text.
+- Kept list markers as source text and replaced broad Markdown-aware Enter behavior with controlled marker continuation and empty-item exit, while preserving stable paragraph lines and independent inline-math rendering.
 
 ## Common Commands
 

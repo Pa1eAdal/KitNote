@@ -15,6 +15,25 @@ function selection(from, to) {
   return { ranges: [EditorSelection.range(from, to)] };
 }
 
+function pressEnter(source, position = source.length, rangeFrom = position, rangeTo = position) {
+  let enterState = EditorState.create({
+    doc: source,
+    selection: EditorSelection.range(rangeFrom, rangeTo),
+    extensions: [noteMarkdown()]
+  });
+  const handled = insertNoteNewline({
+    state: enterState,
+    dispatch(transaction) {
+      enterState = transaction.state;
+    }
+  });
+  return {
+    handled,
+    source: enterState.doc.toString(),
+    cursor: enterState.selection.main.head
+  };
+}
+
 const source = "456$e^{x}$789";
 const state = EditorState.create({ doc: source, extensions: [noteMarkdown()] });
 const inlineMath = findPreviewRegions(state).find((region) => region.kind === "inline-math");
@@ -92,24 +111,60 @@ assert.ok(
 
 for (const line of ["a", "ab", "abc", "abcd", "123", "1234"]) {
   const beforeEnter = `${listSource}\n${line}`;
-  let enterState = EditorState.create({
-    doc: beforeEnter,
-    selection: EditorSelection.cursor(beforeEnter.length),
-    extensions: [noteMarkdown()]
-  });
-  const handled = insertNoteNewline({
-    state: enterState,
-    dispatch(transaction) {
-      enterState = transaction.state;
-    }
-  });
+  const result = pressEnter(beforeEnter);
 
-  assert.equal(handled, true, `Enter should be handled after ${line}`);
+  assert.equal(result.handled, true, `Enter should be handled after ${line}`);
   assert.equal(
-    enterState.doc.toString(),
+    result.source,
     `${beforeEnter}\n`,
     `Enter after ${line} should add one plain newline without changing or indenting source`
   );
 }
+
+for (const [before, after] of [
+  ["1. 123", "1. 123\n2. "],
+  ["9. abc", "9. abc\n10. "],
+  ["1) abc", "1) abc\n2) "],
+  ["  1. nested", "  1. nested\n  2. "],
+  ["- abc", "- abc\n- "],
+  ["* abc", "* abc\n* "],
+  ["+ abc", "+ abc\n+ "],
+  ["  - nested", "  - nested\n  - "]
+]) {
+  const result = pressEnter(before);
+  assert.equal(result.handled, true);
+  assert.equal(result.source, after, `Enter should continue list item: ${before}`);
+  assert.equal(result.cursor, after.length, "cursor should follow the inserted list marker");
+}
+
+for (const [before, after] of [
+  ["1. abc\n2. ", "1. abc\n\n"],
+  ["- abc\n- ", "- abc\n\n"],
+  ["  1. nested\n  2. ", "  1. nested\n\n"],
+  ["  - nested\n  - ", "  - nested\n\n"]
+]) {
+  const result = pressEnter(before);
+  assert.equal(result.handled, true);
+  assert.equal(result.source, after, `Enter should exit an empty list item: ${before}`);
+  assert.equal(result.cursor, after.length, "cursor should move to the normal blank line");
+}
+
+const selectedText = "1. abc";
+assert.deepEqual(
+  pressEnter(selectedText, selectedText.length, 3, selectedText.length),
+  { handled: true, source: "1. \n", cursor: 4 },
+  "a non-empty selection should use plain Enter behavior"
+);
+
+assert.equal(
+  pressEnter("1. abc tail", 6).source,
+  "1. abc\n tail",
+  "Enter before the end of a list line should remain a plain newline"
+);
+assert.equal(
+  pressEnter("1.xxx").source,
+  "1.xxx\n",
+  "a marker without following whitespace is ordinary text"
+);
 
 console.log("Live Preview active-range checks passed.");

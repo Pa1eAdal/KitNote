@@ -209,7 +209,7 @@ git push -u origin main
 
 - Image drag/drop depends on whether the Windows WebView exposes a real file path. The image button is the reliable path.
 - Images render inline in Markdown preview, but full direct manipulation is still a roadmap item.
-- Live Preview supports a focused Markdown subset. List markers remain source-style, and Enter inserts a plain newline instead of Markdown list continuation. Tables, task-list controls, footnotes, and nested edge cases remain raw or partially rendered.
+- Live Preview supports a focused Markdown subset. List markers remain source-style; Enter continues explicit ordered or unordered markers, exits an empty marker, and otherwise inserts a plain newline. Tables, task-list controls, footnotes, and nested edge cases remain raw or partially rendered.
 - Rendered links open with `Ctrl+click`; a normal click reveals their Markdown source.
 - Closing a note hides that window without deleting its saved data. Hidden records are not exposed in the current UI; a selective tray or searchable note manager is planned.
 - Local file links outside the ordinary-document/image safe list are blocked instead of showing a confirmation dialog.
