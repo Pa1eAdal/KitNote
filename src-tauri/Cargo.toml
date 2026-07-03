@@ -1,6 +1,6 @@
 [package]
 name = "kitnote"
-version = "0.2.0"
+version = "0.2.1"
 description = "KitNote lightweight sticky-note desktop app"
 authors = ["KitNote contributors"]
 edition = "2021"

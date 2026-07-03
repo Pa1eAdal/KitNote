@@ -250,9 +250,10 @@ Tauri recommends async commands for heavy work because [synchronous commands exe
 ### Finding 15: Release versioning and icon generation are not reproducible
 
 - **Severity:** Low
+- **Remediation status:** The post-v0.2.0 version collision was fixed during v0.2.1 release preparation; reproducible icon generation remains open
 - **Area:** Release hygiene, privacy, maintainability
 - **Files inspected:** `package.json`, `src-tauri/Cargo.toml`, `src-tauri/tauri.conf.json`, `README.md`, `scripts/generate-icons.ps1`, Git tags
-- **Problem:** `main` is one commit after tag `v0.2.0` but still builds as version `0.2.0`, so two different source states can produce identically versioned binaries. The icon script and README hard-code `C:\Users\RuaKo\Documents\P_project\assets`, exposing a local username/path and preventing another maintainer from reproducing icon generation.
+- **Problem:** The audited post-v0.2.0 source initially still built as version `0.2.0`, allowing different source states to produce identically versioned binaries. Release preparation now increments all application version sources to `0.2.1`. The icon script and README still hard-code `C:\Users\RuaKo\Documents\P_project\assets`, exposing a local username/path and preventing another maintainer from reproducing icon generation.
 - **Why it matters:** Users and maintainers cannot map an installer version to one exact source revision, and release regeneration depends on one workstation.
 - **Recommended fix:** Bump the patch version for post-tag builds or derive an explicit build identifier, tag only the exact released commit, and keep source icon assets in a documented repository location with relative defaults.
 - **Suggested priority:** Before the next tagged release

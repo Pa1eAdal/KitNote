@@ -1,6 +1,6 @@
 {
   "name": "kitnote",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A lightweight local-first Windows sticky-note app built with Tauri.",
   "license": "MIT",
   "type": "module",

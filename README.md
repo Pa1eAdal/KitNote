@@ -4,7 +4,7 @@ KitNote is a lightweight Windows sticky-note app built with Tauri v2, React, Typ
 
 This is a fresh Tauri rebuild, not a continuation of the old Electron app. The only old asset reused is the KitNote icon from `C:\Users\RuaKo\Documents\P_project\assets`.
 
-The current public test release is **KitNote v0.2.0**. It is an early release intended for testing rather than a final stable product.
+The current development version is **KitNote v0.2.1**, prepared for public testing but not yet tagged or published. The latest tagged public test release remains v0.2.0.
 
 This software was fully generated with OpenAI Codex. The development environment identifies the model used for this work as ~~GPT-5~~ GPT-5.5.~~; it would be inaccurate to label it GPT-5.5 without verified provenance.~~
 
@@ -141,7 +141,7 @@ Older note files did not track visibility. On the first launch after this update
 
 Changing the default color affects new or fresh notes, but existing persisted notes keep their saved color. To reset test data, first close KitNote and back up `%APPDATA%\com.kitnote.desktop\notes.json`, then remove that file. KitNote will create a fresh yellow note the next time it starts.
 
-The storage directory is not configurable in v0.2.0. See [Data Location](docs/data-location.md) for the current layout and the planned migration design.
+The storage directory is not configurable in v0.2.1. See [Data Location](docs/data-location.md) for the current layout and the planned migration design.
 
 ## Icons
 

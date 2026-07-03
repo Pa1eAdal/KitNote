@@ -19,7 +19,7 @@ import { selectStartupNote } from "./notes/visibility";
 import type { AppData, CopiedImage, Hyperlink, Note, NoteSettings } from "./types";
 import { invokeCommand, isTauriRuntime } from "./utils/tauri";
 
-const appVersion = "0.2.0";
+const appVersion = "0.2.1";
 const autosaveDelayMs = 450;
 const closeSaveTimeoutMs = 10_000;
 const windowCloseTimeoutMs = 5_000;

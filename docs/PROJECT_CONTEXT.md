@@ -29,9 +29,9 @@ The original icon path is workstation-specific. Reproducible icon generation fro
 
 ## Current Version Status
 
-`package.json`, `src-tauri/Cargo.toml`, and `src-tauri/tauri.conf.json` all declare version `0.2.0`. The documented public test release is v0.2.0, dated 2026-06-24.
+`package.json`, `package-lock.json`, `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/tauri.conf.json`, and the in-app version string all declare development version `0.2.1`. The latest tagged public test release remains v0.2.0, dated 2026-06-24.
 
-As of this update, `fix/security-hardening` is at `eaf84a6`, three commits after the `v0.2.0` tag. These later commits have not been declared a new release. Do not describe an untagged branch build as a new KitNote release. The current Windows installers are unsigned.
+The post-v0.2.0 fixes on `fix/security-hardening` are being prepared as v0.2.1. Until an explicitly approved tag and release are created, describe v0.2.1 as an untagged test build or release candidate, not as a published release. Windows installers remain unsigned.
 
 Always verify the current branch, tags, and version metadata before release work.
 
