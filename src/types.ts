@@ -20,6 +20,7 @@ export interface NoteWindowState {
   y?: number;
   width: number;
   height: number;
+  visible: boolean;
 }
 
 export interface InsertedImage {
@@ -53,6 +54,11 @@ export interface AppData {
   schemaVersion: number;
   globalSettings: GlobalSettings;
   notes: Note[];
+}
+
+export interface LoadAppDataResult {
+  data: AppData;
+  warning?: string;
 }
 
 export interface CopiedImage {

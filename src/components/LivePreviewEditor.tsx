@@ -1,7 +1,6 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { defaultHighlightStyle, syntaxHighlighting } from "@codemirror/language";
-import { markdown } from "@codemirror/lang-markdown";
 import { EditorSelection, EditorState, RangeSetBuilder, StateField } from "@codemirror/state";
 import {
   Decoration,
@@ -14,10 +13,15 @@ import {
 } from "@codemirror/view";
 import {
   findPreviewRegions,
+  selectPreviewRegions,
   type PreviewRegion,
-  selectionTouchesRegion
 } from "../editor/livePreviewRanges";
-import { renderMarkdown, renderMarkdownInline, renderMathPreview } from "../editor/markdown";
+import {
+  renderMarkdown,
+  renderMarkdownInline,
+  renderMathPreview
+} from "../editor/markdown";
+import { noteEnterKeyBinding, noteMarkdown } from "../editor/noteMarkdown";
 
 interface LivePreviewEditorProps {
   value: string;
@@ -101,8 +105,7 @@ function buildDecorations(
   openLink: (target: string) => void
 ): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
-  for (const region of findPreviewRegions(state)) {
-    if (selectionTouchesRegion(state.selection, region)) continue;
+  for (const region of selectPreviewRegions(state.selection, findPreviewRegions(state))) {
     builder.add(
       region.from,
       region.to,
@@ -160,9 +163,9 @@ export const LivePreviewEditor = forwardRef<LivePreviewEditorHandle, LivePreview
         extensions: [
           history(),
           drawSelection(),
-          markdown(),
+          noteMarkdown(),
           syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-          keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
+          keymap.of([noteEnterKeyBinding, ...defaultKeymap, ...historyKeymap, indentWithTab]),
           EditorView.lineWrapping,
           placeholder("Write Markdown, TeX, links, and notes..."),
           livePreview(openLink),

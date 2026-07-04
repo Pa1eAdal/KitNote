@@ -9,7 +9,6 @@ export type PreviewKind =
   | "link"
   | "fenced-code"
   | "blockquote"
-  | "list"
   | "inline-math"
   | "block-math";
 
@@ -77,7 +76,13 @@ function findMathRegions(source: string, existingRegions: PreviewRegion[]): Prev
     }
 
     const to = close + delimiterLength;
-    if (close > contentStart && !overlapsExistingRegion(existingRegions, position, to)) {
+    const overlapsProtectedSource = existingRegions.some(
+      (region) =>
+        (region.kind === "inline-code" || region.kind === "fenced-code" || region.kind === "link") &&
+        position < region.to &&
+        to > region.from
+    );
+    if (close > contentStart && !overlapsProtectedSource) {
       regions.push({
         from: position,
         to,
@@ -119,9 +124,6 @@ export function findPreviewRegions(state: EditorState): PreviewRegion[] {
       } else if (node.name === "Blockquote") {
         kind = "blockquote";
         block = true;
-      } else if (node.name === "BulletList" || node.name === "OrderedList") {
-        kind = "list";
-        block = true;
       }
 
       if (!kind || node.to <= node.from) return;
@@ -150,4 +152,17 @@ export function selectionTouchesRegion(
     }
     return range.from < region.to && range.to > region.from;
   });
+}
+
+export function selectPreviewRegions(
+  selection: { ranges: readonly { from: number; to: number }[] },
+  regions: PreviewRegion[]
+): PreviewRegion[] {
+  const selected: PreviewRegion[] = [];
+  for (const region of regions) {
+    if (selectionTouchesRegion(selection, region)) continue;
+    if (overlapsExistingRegion(selected, region.from, region.to)) continue;
+    selected.push(region);
+  }
+  return selected;
 }

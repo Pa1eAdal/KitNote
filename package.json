@@ -1,6 +1,6 @@
 {
   "name": "kitnote",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A lightweight local-first Windows sticky-note app built with Tauri.",
   "license": "MIT",
   "type": "module",
@@ -12,7 +12,9 @@
     "build": "tsc --noEmit && vite build",
     "tauri:build": "tauri build",
     "check": "tsc --noEmit",
-    "check:live-preview": "node scripts/check-live-preview-ranges.mjs"
+    "check:live-preview": "node scripts/check-live-preview-ranges.mjs",
+    "check:note-visibility": "node scripts/check-note-visibility.mjs",
+    "check:save-queue": "node scripts/check-save-queue.mjs"
   },
   "dependencies": {
     "@codemirror/commands": "^6.10.4",

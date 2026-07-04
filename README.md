@@ -4,7 +4,7 @@ KitNote is a lightweight Windows sticky-note app built with Tauri v2, React, Typ
 
 This is a fresh Tauri rebuild, not a continuation of the old Electron app. The only old asset reused is the KitNote icon from `C:\Users\RuaKo\Documents\P_project\assets`.
 
-The current public test release is **KitNote v0.2.0**. It is an early release intended for testing rather than a final stable product.
+The current development version is **KitNote v0.2.1**, prepared for public testing but not yet tagged or published. The latest tagged public test release remains v0.2.0.
 
 This software was fully generated with OpenAI Codex. The development environment identifies the model used for this work as ~~GPT-5~~ GPT-5.5.~~; it would be inaccurate to label it GPT-5.5 without verified provenance.~~
 
@@ -14,16 +14,18 @@ This software was fully generated with OpenAI Codex. The development environment
 - Always-on-top enabled by default, with a setting to turn it off.
 - Hidden top and bottom toolbars that appear on hover.
 - CodeMirror 6 live preview with Markdown source kept as the single source of truth.
-- Cursor-aware rendering for headings, bold, italic, inline code, fenced code, links, lists, blockquotes, and TeX math.
+- Cursor-aware rendering for headings, bold, italic, inline code, fenced code, links, blockquotes, and TeX math. List markers stay as editable source text for stable line editing.
 - TeX math rendering through KaTeX, including inline `$E = mc^2$` and block `$$...$$` syntax.
 - Configurable note color, font color, font size, font family, opacity, and corner radius.
 - Multiple note creation from the `+` button.
+- Notes that were still visible at the end of the last session restore as windows while `restoreAllNotesOnLaunch` is enabled.
 - Per-note titles that can be renamed by clicking the title in the top toolbar.
-- Local JSON persistence.
+- Local JSON persistence with single-instance protection, an interprocess lock, atomic replacement, and a last-known-good backup.
+- X and native close requests flush the latest queued note state before the window closes.
 - Image insertion from a file picker, copied into KitNote app data.
 - Drag-and-drop image path support when the desktop WebView exposes a real file path.
 - Hyperlink insertion for web URLs and local files/folders.
-- Safe local link opening from Rust, with script/executable-like files blocked.
+- Safe local link opening from Rust, with an ordinary-document/image allowlist and network/UNC targets blocked.
 
 ## Tech Stack
 
@@ -42,7 +44,9 @@ This software was fully generated with OpenAI Codex. The development environment
 - `markdown-it` and `katex`: Markdown rendering plus a small local math rule, avoiding the vulnerable `markdown-it-katex` package.
 - CodeMirror 6 packages: source editing, undo/redo, cursor handling, Markdown parsing, and live-preview decorations.
 - `lucide-react`: lightweight icon components for toolbar buttons.
-- Rust crates `serde`, `serde_json`, `uuid`, `url`, and `open`: typed data, JSON persistence, IDs, URL validation, and safe default-app opening.
+- Rust crates `serde`, `serde_json`, `uuid`, and `url`: typed data, JSON persistence, IDs, and URL validation.
+- `tauri-plugin-single-instance` and `fs2`: one running KitNote process plus a cross-process note-data lock.
+- `windows-sys`: direct Windows `ShellExecuteW` calls after local/web targets pass Rust validation.
 
 ## Install Requirements
 
@@ -123,9 +127,21 @@ Inserted images are copied under:
 
 These files are private user data and should not be committed to Git.
 
+KitNote also maintains:
+
+- `notes.backup.json`: the last valid data file before the latest successful replacement;
+- `notes.corrupt-*.json`: malformed files preserved for manual recovery;
+- `notes.lock`: an empty process-lock file with no note content.
+
+Only one KitNote process writes this directory. A second launch focuses an existing KitNote window and exits. Saves use unique temporary files, a process-wide plus operating-system lock, stale-version checks, and atomic replacement. Read failures stop saves instead of resetting data.
+
+Closing a note is not deletion. X and native Windows close requests use one path: save the latest edit/window state as hidden, then destroy only that window. Hidden notes do not auto-open next time and are not exposed in the current Settings UI. If every note was hidden, KitNote reopens the most recently updated non-empty note, or the most recently updated note if all are blank, so the app is not invisible.
+
+Older note files did not track visibility. On the first launch after this update, KitNote keeps the most recently updated legacy note visible and preserves the others as hidden records. A selective note manager or recovery screen is deferred to future work.
+
 Changing the default color affects new or fresh notes, but existing persisted notes keep their saved color. To reset test data, first close KitNote and back up `%APPDATA%\com.kitnote.desktop\notes.json`, then remove that file. KitNote will create a fresh yellow note the next time it starts.
 
-The storage directory is not configurable in v0.2.0. See [Data Location](docs/data-location.md) for the current layout and the planned migration design.
+The storage directory is not configurable in v0.2.1. See [Data Location](docs/data-location.md) for the current layout and the planned migration design.
 
 ## Icons
 
@@ -172,11 +188,14 @@ git push -u origin main
 - Type Markdown and TeX and confirm inactive syntax renders automatically.
 - Click rendered syntax and confirm its raw source reappears for editing.
 - Insert a PNG/JPG/GIF/WebP image and confirm it still appears after restart.
-- Insert a web link and double-click it in Preview.
-- Insert a local document link and double-click it in Preview.
-- Confirm `.exe`, `.bat`, `.cmd`, and `.ps1` local links are blocked.
+- Insert a web link and `Ctrl+click` it when rendered.
+- Insert a safe local document/image link and `Ctrl+click` it when rendered.
+- Confirm executable/script/shortcut/control links and UNC/network paths are blocked.
 - Create a second note with the `+` button.
-- Quit and relaunch to confirm notes persist.
+- Close the second note, quit, and relaunch to confirm only notes left visible restore.
+- Create three notes, close two, quit, and relaunch to confirm only the note left open returns.
+- Enter `1.xxx$e^{x}$`, `2. xxx`, then `a`, `ab`, `abc`, `abcd`, `123`, and `1234` on separate lines; confirm every line remains visible and Enter continues to work.
+- Launch KitNote a second time and confirm it focuses the existing app instead of starting another writer.
 
 ## Troubleshooting
 
@@ -190,10 +209,10 @@ git push -u origin main
 
 - Image drag/drop depends on whether the Windows WebView exposes a real file path. The image button is the reliable path.
 - Images render inline in Markdown preview, but full direct manipulation is still a roadmap item.
-- Live Preview supports a focused Markdown subset. Tables, task-list controls, footnotes, and nested edge cases remain raw or partially rendered.
+- Live Preview supports a focused Markdown subset. List markers remain source-style; Enter continues explicit ordered or unordered markers, exits an empty marker, and otherwise inserts a plain newline. Tables, task-list controls, footnotes, and nested edge cases remain raw or partially rendered.
 - Rendered links open with `Ctrl+click`; a normal click reveals their Markdown source.
-- Closing a note closes that window; a tray menu for reopening saved notes is planned.
-- Risky local file links are currently blocked instead of showing a confirmation dialog.
+- Closing a note hides that window without deleting its saved data. Hidden records are not exposed in the current UI; a selective tray or searchable note manager is planned.
+- Local file links outside the ordinary-document/image safe list are blocked instead of showing a confirmation dialog.
 - MSI generation may require extra Windows build tooling.
 - Rounded corners use a transparent, decoration-free Tauri window with the visible note inset in CSS. Native Windows shadows are disabled for transparent note windows to avoid a rectangular frame around rounded corners.
 - Runtime diagnostics are written to `kitnote.log` in the same app data directory as `notes.json`.

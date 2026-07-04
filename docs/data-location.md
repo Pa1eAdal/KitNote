@@ -11,14 +11,30 @@ KitNote stores private user data in the Tauri application data directory. On Win
 The directory contains:
 
 ```text
-notes.json        Note titles, Markdown/TeX source, settings, and window state
+notes.json        Note titles, Markdown/TeX source, settings, window state, and visibility
+notes.backup.json Last known good notes file from before the latest successful replacement
+notes.lock        Empty interprocess lock file; contains no note content
+notes.corrupt-*.json
+                  Preserved malformed data for manual recovery
 assets\           Images copied into KitNote
 kitnote.log       Runtime diagnostics
 ```
 
-This is user data, not disposable cache data. Deleting `notes.json` resets saved notes. Deleting `assets` can break image references inside notes.
+This is user data, not disposable cache data. Deleting `notes.json` resets saved notes. Deleting `assets` can break image references inside notes. `notes.backup.json` and `notes.corrupt-*.json` should be retained until current notes have been verified.
 
 The Rust backend resolves the directory through Tauri's `app_data_dir()` API. KitNote is currently a Windows-focused application, although the API itself is platform-aware.
+
+The committed Tauri identifier is `com.kitnote.desktop`, and Git history shows that identifier has not changed since the Tauri project was created. Normal `npm.cmd run tauri:dev` runs therefore use the directory above. Isolated QA runs may temporarily use a different identifier such as `com.kitnote.codex-runtime`; those runs have a separate app-data directory and do not load normal KitNote notes.
+
+## Write And Recovery Behavior
+
+KitNote permits only one running app instance. Note commands also take an operating-system file lock, so a second writer cannot enter the read/modify/write section at the same time.
+
+Every save uses a unique temporary file, flushes it, preserves the previous valid `notes.json` as `notes.backup.json`, and then atomically replaces the main file. A stale window version is rejected instead of overwriting a newer saved copy.
+
+Ordinary permission, sharing, or read errors stop the save/create operation. KitNote does not continue from empty/default data after these errors.
+
+If startup finds malformed JSON, it moves the original to a uniquely named `notes.corrupt-*.json`, creates a clean note file, and displays a recovery warning. If malformed data appears during save or note creation, KitNote copies it for recovery and refuses to replace the original.
 
 ## Why It Is Not Configurable In v0.2.0
 

@@ -1,6 +1,7 @@
-import type { AppData, Note, NoteWindowState } from "../types";
+import type { AppData, LoadAppDataResult, Note, NoteWindowState } from "../types";
 import { defaultAppData } from "../settings/defaults";
 import { invokeCommand, isTauriRuntime } from "../utils/tauri";
+import { ensureAtLeastOneVisibleNote, visibleNotes } from "./visibility";
 
 const browserStorageKey = "kitnote.dev.notes";
 const newNoteGap = 16;
@@ -12,22 +13,41 @@ interface WorkArea {
   height: number;
 }
 
-export const loadAppData = async (): Promise<AppData> => {
+export const loadAppData = async (): Promise<LoadAppDataResult> => {
   if (isTauriRuntime()) {
-    return invokeCommand<AppData>("load_app_data");
+    return invokeCommand<LoadAppDataResult>("load_app_data");
   }
 
   const stored = localStorage.getItem(browserStorageKey);
-  return stored ? (JSON.parse(stored) as AppData) : defaultAppData();
+  if (!stored) {
+    const data = defaultAppData();
+    localStorage.setItem(browserStorageKey, JSON.stringify(data));
+    return { data };
+  }
+  const parsed = JSON.parse(stored) as AppData;
+  const data = ensureAtLeastOneVisibleNote(parsed);
+  if (data !== parsed) {
+    localStorage.setItem(browserStorageKey, JSON.stringify(data));
+  }
+  return {
+    data
+  };
 };
 
-export const saveNote = async (note: Note): Promise<AppData> => {
+export const saveNote = async (note: Note, expectedUpdatedAt: string | null): Promise<AppData> => {
   if (isTauriRuntime()) {
-    return invokeCommand<AppData>("save_note", { note });
+    return invokeCommand<AppData>("save_note", { note, expectedUpdatedAt });
   }
 
-  const current = await loadAppData();
-  const notes = current.notes.some((item) => item.id === note.id)
+  const { data: current } = await loadAppData();
+  const existing = current.notes.find((item) => item.id === note.id);
+  if (existing && existing.updatedAt !== expectedUpdatedAt) {
+    throw new Error("This note changed after this window loaded it. The newer saved copy was kept.");
+  }
+  if (!existing && expectedUpdatedAt !== null) {
+    throw new Error("This note no longer exists in saved data.");
+  }
+  const notes = existing
     ? current.notes.map((item) => (item.id === note.id ? note : item))
     : [...current.notes, note];
   const next = { ...current, notes };
@@ -41,33 +61,77 @@ export const createNoteWindow = async (source: Note): Promise<Note> => {
     const workArea = await readCurrentWorkArea();
     const template = createNoteFromTemplate(source, sourceWindow, workArea);
     const note = await invokeCommand<Note>("create_note_window", { source: template });
-    const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
-    const label = `note-${note.id}`;
-    const windowUrl = `/?noteId=${encodeURIComponent(note.id)}`;
-    const webview = new WebviewWindow(label, {
-      url: windowUrl,
-      title: "KitNote",
-      width: note.window.width,
-      height: note.window.height,
-      x: note.window.x,
-      y: note.window.y,
-      minWidth: 260,
-      minHeight: 220,
-      preventOverflow: { width: newNoteGap, height: newNoteGap },
-      resizable: true,
-      decorations: false,
-      transparent: true,
-      alwaysOnTop: note.settings.alwaysOnTop,
-      shadow: false,
-      focus: true
-    });
-
-    await waitForWindowCreation(webview, label);
+    await openNoteWindow(note, true);
     return note;
   }
 
   return createNoteFromTemplate(source, source.window);
 };
+
+export const restoreSavedNoteWindows = async (
+  data: AppData,
+  activeNoteId: string
+): Promise<number> => {
+  if (!isTauriRuntime() || !data.globalSettings.restoreAllNotesOnLaunch) return 0;
+
+  const { getCurrentWindow } = await import("@tauri-apps/api/window");
+  if (getCurrentWindow().label !== "main") return 0;
+
+  let restored = 0;
+  const failures: string[] = [];
+  for (const note of visibleNotes(data.notes)) {
+    if (note.id === activeNoteId) continue;
+    try {
+      const created = await openNoteWindow(note, false);
+      if (created) restored += 1;
+    } catch (error) {
+      failures.push(`${note.title}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  if (failures.length > 0) {
+    throw new Error(`Some saved notes could not be restored: ${failures.join("; ")}`);
+  }
+  return restored;
+};
+
+async function openNoteWindow(note: Note, focus: boolean): Promise<boolean> {
+  const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+  const label = noteWindowLabel(note.id);
+  const existing = await WebviewWindow.getByLabel(label);
+  if (existing) {
+    if (focus) {
+      await existing.setFocus();
+    }
+    return false;
+  }
+
+  const webview = new WebviewWindow(label, {
+    url: `/?noteId=${encodeURIComponent(note.id)}`,
+    title: "KitNote",
+    width: note.window.width,
+    height: note.window.height,
+    x: note.window.x,
+    y: note.window.y,
+    minWidth: 260,
+    minHeight: 220,
+    preventOverflow: { width: newNoteGap, height: newNoteGap },
+    resizable: true,
+    decorations: false,
+    transparent: true,
+    alwaysOnTop: note.settings.alwaysOnTop,
+    shadow: false,
+    focus
+  });
+  await waitForWindowCreation(webview, label);
+  return true;
+}
+
+function noteWindowLabel(noteId: string): string {
+  if (!/^[a-zA-Z0-9_-]+$/.test(noteId)) {
+    throw new Error("Saved note ID contains characters that cannot be used in a window label.");
+  }
+  return `note-${noteId}`;
+}
 
 async function waitForWindowCreation(webview: import("@tauri-apps/api/webviewWindow").WebviewWindow, label: string) {
   await new Promise<void>((resolve, reject) => {
@@ -113,7 +177,8 @@ export function createNoteFromTemplate(source: Note, sourceWindow: NoteWindowSta
     settings: { ...source.settings },
     window: {
       ...size,
-      ...position
+      ...position,
+      visible: true
     },
     images: [],
     links: []
@@ -175,7 +240,8 @@ async function readCurrentWindowState(fallback: NoteWindowState): Promise<NoteWi
       x: Math.round(logicalPosition.x),
       y: Math.round(logicalPosition.y),
       width: Math.round(logicalSize.width),
-      height: Math.round(logicalSize.height)
+      height: Math.round(logicalSize.height),
+      visible: fallback.visible === true
     };
   } catch (error) {
     console.warn("KitNote could not read current window geometry; using saved note window state.", error);

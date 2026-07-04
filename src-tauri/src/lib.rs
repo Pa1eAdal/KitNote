@@ -1,6 +1,10 @@
+mod link_policy;
+mod persistence;
+
+use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::{
-    fs,
+    fs::{self, OpenOptions},
     path::{Path, PathBuf},
     sync::Mutex,
     time::{SystemTime, UNIX_EPOCH},
@@ -38,6 +42,8 @@ struct NoteWindowState {
     y: Option<i32>,
     width: f64,
     height: f64,
+    #[serde(default)]
+    visible: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -88,6 +94,13 @@ struct AppData {
     notes: Vec<Note>,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct LoadAppDataResponse {
+    data: AppData,
+    warning: Option<String>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct CopiedImage {
@@ -130,6 +143,7 @@ fn empty_note(settings: NoteSettings) -> Note {
             y: None,
             width: 360.0,
             height: 420.0,
+            visible: true,
         },
         images: Vec::new(),
         links: Vec::new(),
@@ -139,17 +153,24 @@ fn empty_note(settings: NoteSettings) -> Note {
 fn note_from_template(source: Note) -> Note {
     let mut note = empty_note(source.settings);
     note.window = source.window;
+    note.window.visible = true;
     note
 }
 
 fn default_app_data() -> AppData {
+    let mut data = empty_app_data();
+    data.notes.push(empty_note(default_note_settings()));
+    data
+}
+
+fn empty_app_data() -> AppData {
     AppData {
         schema_version: 1,
         global_settings: GlobalSettings {
             restore_all_notes_on_launch: true,
             confirm_risky_local_links: true,
         },
-        notes: vec![empty_note(default_note_settings())],
+        notes: Vec::new(),
     }
 }
 
@@ -161,10 +182,6 @@ fn app_data_dir(app: &AppHandle) -> Result<PathBuf, String> {
     fs::create_dir_all(&dir)
         .map_err(|error| format!("Could not create KitNote data directory: {error}"))?;
     Ok(dir)
-}
-
-fn notes_file(app: &AppHandle) -> Result<PathBuf, String> {
-    Ok(app_data_dir(app)?.join("notes.json"))
 }
 
 fn append_log(app: &AppHandle, message: impl AsRef<str>) {
@@ -186,68 +203,64 @@ fn append_log(app: &AppHandle, message: impl AsRef<str>) {
     }
 }
 
-fn read_app_data(app: &AppHandle) -> Result<AppData, String> {
-    let path = notes_file(app)?;
-    if !path.exists() {
-        let data = default_app_data();
-        write_app_data(app, &data)?;
-        return Ok(data);
-    }
-
-    let raw =
-        fs::read_to_string(&path).map_err(|error| format!("Could not read notes.json: {error}"))?;
-    match serde_json::from_str::<AppData>(&raw) {
-        Ok(mut data) => {
-            if data.notes.is_empty() {
-                data.notes.push(empty_note(default_note_settings()));
-            }
-            Ok(data)
-        }
-        Err(error) => {
-            let backup = path.with_file_name(format!("notes.corrupt-{}.json", now_stamp()));
-            let _ = fs::rename(&path, backup);
-            let data = default_app_data();
-            write_app_data(app, &data)?;
-            Err(format!(
-                "Notes data was malformed and has been moved aside. KitNote started a clean notes file. Details: {error}"
-            ))
-        }
-    }
-}
-
-fn write_app_data(app: &AppHandle, data: &AppData) -> Result<(), String> {
-    let path = notes_file(app)?;
-    let tmp = path.with_extension("json.tmp");
-    let encoded = serde_json::to_string_pretty(data)
-        .map_err(|error| format!("Could not encode notes: {error}"))?;
-    fs::write(&tmp, encoded)
-        .map_err(|error| format!("Could not write notes temp file: {error}"))?;
-    fs::rename(&tmp, &path).map_err(|error| format!("Could not replace notes.json: {error}"))?;
-    Ok(())
+fn with_data_access<T>(
+    app: &AppHandle,
+    state: &State<'_, AppState>,
+    operation: impl FnOnce(&Path) -> Result<T, String>,
+) -> Result<T, String> {
+    let _process_guard = state
+        .data_lock
+        .lock()
+        .map_err(|_| "KitNote's in-process data lock was poisoned.".to_string())?;
+    let data_dir = app_data_dir(app)?;
+    let lock_file = OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .open(data_dir.join("notes.lock"))
+        .map_err(|error| format!("Could not open KitNote's interprocess data lock: {error}"))?;
+    lock_file
+        .try_lock_exclusive()
+        .map_err(|error| {
+            format!(
+                "Another KitNote writer is using the note data. No data was changed; try again. Details: {error}"
+            )
+        })?;
+    operation(&data_dir.join("notes.json"))
 }
 
 #[tauri::command]
-fn load_app_data(app: AppHandle, state: State<'_, AppState>) -> Result<AppData, String> {
-    let _guard = state
-        .data_lock
-        .lock()
-        .map_err(|_| "KitNote data lock was poisoned while loading notes.".to_string())?;
-    read_app_data(&app)
+fn load_app_data(
+    app: AppHandle,
+    state: State<'_, AppState>,
+) -> Result<LoadAppDataResponse, String> {
+    let outcome = with_data_access(&app, &state, persistence::load_or_initialize)?;
+    if let Some(warning) = &outcome.warning {
+        append_log(&app, warning);
+    }
+    Ok(LoadAppDataResponse {
+        data: outcome.data,
+        warning: outcome.warning,
+    })
 }
 
 #[tauri::command]
-fn save_note(app: AppHandle, state: State<'_, AppState>, note: Note) -> Result<AppData, String> {
-    let _guard = state
-        .data_lock
-        .lock()
-        .map_err(|_| "KitNote data lock was poisoned while saving notes.".to_string())?;
-    let mut data = read_app_data(&app).unwrap_or_else(|_| default_app_data());
-    match data.notes.iter_mut().find(|item| item.id == note.id) {
-        Some(existing) => *existing = note,
-        None => data.notes.push(note),
+fn save_note(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    note: Note,
+    expected_updated_at: Option<String>,
+) -> Result<AppData, String> {
+    let note_id = note.id.clone();
+    append_log(&app, format!("Save started note_id={note_id}"));
+    let result = with_data_access(&app, &state, |path| {
+        persistence::save_note(path, note, expected_updated_at.as_deref())
+    });
+    match &result {
+        Ok(_) => append_log(&app, format!("Save succeeded note_id={note_id}")),
+        Err(error) => append_log(&app, format!("Save failed note_id={note_id} error={error}")),
     }
-    write_app_data(&app, &data)?;
-    Ok(data)
+    result
 }
 
 #[tauri::command]
@@ -256,26 +269,8 @@ fn create_note_window(
     state: State<'_, AppState>,
     source: Note,
 ) -> Result<Note, String> {
-    let note = note_from_template(source);
-
-    {
-        let _guard = state
-            .data_lock
-            .lock()
-            .map_err(|_| "KitNote data lock was poisoned while creating a note.".to_string())?;
-        let mut data = read_app_data(&app).unwrap_or_else(|error| {
-            append_log(
-                &app,
-                format!("Recovering from read error during new note creation: {error}"),
-            );
-            default_app_data()
-        });
-        data.notes.push(note.clone());
-        write_app_data(&app, &data)?;
-    }
-
+    let note = with_data_access(&app, &state, |path| persistence::create_note(path, source))?;
     append_log(&app, format!("Prepared new note data note_id={}", note.id));
-
     Ok(note)
 }
 
@@ -325,41 +320,9 @@ fn copy_image_to_note(
 #[tauri::command]
 fn open_link_target(target: String, kind: LinkKind) -> Result<(), String> {
     match kind {
-        LinkKind::Web => open_web_target(&target),
-        LinkKind::File => open_file_target(&target),
+        LinkKind::Web => link_policy::open_web_target(&target),
+        LinkKind::File => link_policy::open_file_target(&target),
     }
-}
-
-fn open_web_target(target: &str) -> Result<(), String> {
-    let url =
-        url::Url::parse(target).map_err(|_| "The hyperlink is not a valid URL.".to_string())?;
-    match url.scheme() {
-        "http" | "https" => {
-            open::that(url.as_str()).map_err(|error| format!("Could not open URL: {error}"))
-        }
-        _ => Err("KitNote only opens http and https URLs.".to_string()),
-    }
-}
-
-fn open_file_target(target: &str) -> Result<(), String> {
-    let path = if target.starts_with("file://") {
-        url::Url::parse(target)
-            .map_err(|_| "The file URL is invalid.".to_string())?
-            .to_file_path()
-            .map_err(|_| "The file URL could not be converted to a local path.".to_string())?
-    } else {
-        PathBuf::from(target)
-    };
-    let canonical = fs::canonicalize(path)
-        .map_err(|error| format!("The local link target does not exist: {error}"))?;
-    if has_risky_extension(&canonical) {
-        return Err(
-            "KitNote blocked this local link because it looks executable or script-like."
-                .to_string(),
-        );
-    }
-
-    open::that(canonical).map_err(|error| format!("Could not open local target: {error}"))
 }
 
 fn sanitize_segment(value: &str) -> String {
@@ -381,31 +344,18 @@ fn is_allowed_image_extension(path: &Path) -> bool {
     )
 }
 
-fn has_risky_extension(path: &Path) -> bool {
-    matches!(
-        path.extension()
-            .and_then(|value| value.to_str())
-            .map(|value| value.to_ascii_lowercase())
-            .as_deref(),
-        Some(
-            "exe"
-                | "bat"
-                | "cmd"
-                | "com"
-                | "msi"
-                | "ps1"
-                | "vbs"
-                | "js"
-                | "jse"
-                | "wsf"
-                | "scr"
-                | "jar"
-        )
-    )
-}
-
 pub fn run() {
     let result = tauri::Builder::default()
+        .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            let window = app
+                .get_webview_window("main")
+                .or_else(|| app.webview_windows().into_values().next());
+            if let Some(window) = window {
+                let _ = window.unminimize();
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .manage(AppState {
             data_lock: Mutex::new(()),
         })
@@ -427,8 +377,8 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::{
-        default_note_settings, empty_note, has_risky_extension, is_allowed_image_extension,
-        note_from_template, Hyperlink, InsertedImage, LinkKind,
+        default_note_settings, empty_note, is_allowed_image_extension, note_from_template,
+        Hyperlink, InsertedImage, LinkKind,
     };
     use std::path::Path;
 
@@ -437,13 +387,6 @@ mod tests {
         assert!(is_allowed_image_extension(Path::new("note.PNG")));
         assert!(is_allowed_image_extension(Path::new("note.webp")));
         assert!(!is_allowed_image_extension(Path::new("note.svg")));
-    }
-
-    #[test]
-    fn blocks_script_like_local_links() {
-        assert!(has_risky_extension(Path::new("installer.exe")));
-        assert!(has_risky_extension(Path::new("script.ps1")));
-        assert!(!has_risky_extension(Path::new("document.pdf")));
     }
 
     #[test]
