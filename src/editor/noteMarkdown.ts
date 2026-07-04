@@ -29,8 +29,8 @@ export const insertNoteNewline: StateCommand = ({ state, dispatch }) => {
   if (content.trim().length === 0) {
     dispatch(
       state.update({
-        changes: { from: line.from, to: line.to, insert: state.lineBreak },
-        selection: EditorSelection.cursor(line.from + state.lineBreak.length),
+        changes: { from: line.from, to: line.to, insert: "" },
+        selection: EditorSelection.cursor(line.from),
         scrollIntoView: true,
         userEvent: "input"
       })

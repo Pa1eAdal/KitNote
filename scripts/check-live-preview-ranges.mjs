@@ -138,10 +138,10 @@ for (const [before, after] of [
 }
 
 for (const [before, after] of [
-  ["1. abc\n2. ", "1. abc\n\n"],
-  ["- abc\n- ", "- abc\n\n"],
-  ["  1. nested\n  2. ", "  1. nested\n\n"],
-  ["  - nested\n  - ", "  - nested\n\n"]
+  ["1. abc\n2. ", "1. abc\n"],
+  ["- abc\n- ", "- abc\n"],
+  ["  1. nested\n  2. ", "  1. nested\n"],
+  ["  - nested\n  - ", "  - nested\n"]
 ]) {
   const result = pressEnter(before);
   assert.equal(result.handled, true);
